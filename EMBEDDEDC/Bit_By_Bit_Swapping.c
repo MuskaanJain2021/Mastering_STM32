@@ -12,164 +12,157 @@ Reversed (binary): 11110111101110111101011010111101 (0xF77DB57B)
 #include <stdint.h>
 #include <stdlib.h>
 
+#define BYTE_SIZE 1
+#define HALF_WORD_SIZE 2
+#define WORD_SIZE 4
+#define MAX_BITS 32 // Maximum number of bits supported
 #define SIZE_OF(var) ((char*)(&var + 1) - (char*)(&var))
 
-// Function to convert a decimal number to binary string
-char* DecToBin(void* num, size_t size) {
+// Function to convert a decimal number to binary string (static allocation)
+void DecToBin(void* num, size_t size, char* bin) {
     int bit_count = size * 8; // Calculate the number of bits
-    char* bin = (char*)malloc(bit_count + 1); // Allocate memory for bits + null terminator
-    if (bin == NULL) {
-        fprintf(stderr, "Memory allocation failed in DecToBin function\n");
-        return NULL; // Check if memory allocation was successful
-    }
-    bin[bit_count] = '\0'; // Set the null terminator at the end of the string
     uint32_t n = 0;
-    if (size == SIZE_OF(*(uint8_t*)num)) {
-        n = *((uint8_t*)num);
-    } else if (size == SIZE_OF(*(uint16_t*)num)) {
-        n = *((uint16_t*)num);
-    } else if (size == SIZE_OF(*(uint32_t*)num)) {
-        n = *((uint32_t*)num);
+
+    switch (size) {
+        case BYTE_SIZE:
+            n = *((uint8_t*)num);
+            break;
+        case HALF_WORD_SIZE:
+            n = *((uint16_t*)num);
+            break;
+        case WORD_SIZE:
+            n = *((uint32_t*)num);
+            break;
+        default:
+            fprintf(stderr, "Unsupported size in DecToBin function\n");
+            return;
     }
 
     for (int idx = bit_count - 1; idx >= 0; idx--) {
-        if (n & (1 << idx)) // Check if the bit is set
-            bin[bit_count - 1 - idx] = '1'; // Set the corresponding index in the string to '1'
-        else
-            bin[bit_count - 1 - idx] = '0'; // Set the corresponding index in the string to '0'
+        bin[bit_count - 1 - idx] = (n & (1 << idx)) ? '1' : '0'; // Set the corresponding index in the string
     }
-    return bin;
+    bin[bit_count] = '\0'; // Set the null terminator at the end of the string
 }
 
-// Function to reverse bits of a number
+// Helper function to reverse bits of a number
+uint32_t reverseBitsHelper(uint32_t num, size_t bits) {
+    uint32_t reversed = 0;
+    for (int i = 0; i < bits; i++) {
+        reversed |= (num & 1) << (bits - 1 - i);
+        num >>= 1;
+    }
+    return reversed;
+}
+
+// Function to reverse bits of a number (dynamic allocation for the result)
 void* reverseBits(void* num, size_t size) {
     uint32_t n = 0;
-    if (size == SIZE_OF(*(uint8_t*)num)) {
-        n = *((uint8_t*)num);
-    } else if (size == SIZE_OF(*(uint16_t*)num)) {
-        n = *((uint16_t*)num);
-    } else if (size == SIZE_OF(*(uint32_t*)num)) {
-        n = *((uint32_t*)num);
+
+    switch (size) {
+        case BYTE_SIZE:
+            n = *((uint8_t*)num);
+            break;
+        case HALF_WORD_SIZE:
+            n = *((uint16_t*)num);
+            break;
+        case WORD_SIZE:
+            n = *((uint32_t*)num);
+            break;
+        default:
+            fprintf(stderr, "Unsupported size in reverseBits function\n");
+            return NULL;
     }
 
-    uint32_t reversed = 0;
-    int bit_count = size * 8;
-    for (int i = 0; i < bit_count; i++) {
-        reversed |= (n & 1) << (bit_count - 1 - i);
-        n >>= 1;
+    uint32_t reversed = reverseBitsHelper(n, size * 8);
+    void* result = NULL;
+
+    switch (size) {
+        case BYTE_SIZE:
+            result = malloc(sizeof(uint8_t));
+            if (result != NULL) {
+                *((uint8_t*)result) = (uint8_t)reversed;
+            }
+            break;
+        case HALF_WORD_SIZE:
+            result = malloc(sizeof(uint16_t));
+            if (result != NULL) {
+                *((uint16_t*)result) = (uint16_t)reversed;
+            }
+            break;
+        case WORD_SIZE:
+            result = malloc(sizeof(uint32_t));
+            if (result != NULL) {
+                *((uint32_t*)result) = (uint32_t)reversed;
+            }
+            break;
+        default:
+            fprintf(stderr, "Unsupported size in reverseBits function\n");
+            return NULL;
     }
 
-    if (size == SIZE_OF(*(uint8_t*)num)) {
-        uint8_t* result = (uint8_t*)malloc(sizeof(uint8_t));
-        *result = (uint8_t)reversed;
-        return result;
-    } else if (size == SIZE_OF(*(uint16_t*)num)) {
-        uint16_t* result = (uint16_t*)malloc(sizeof(uint16_t));
-        *result = (uint16_t)reversed;
-        return result;
-    } else if (size == SIZE_OF(*(uint32_t*)num)) {
-        uint32_t* result = (uint32_t*)malloc(sizeof(uint32_t));
-        *result = (uint32_t)reversed;
-        return result;
-    }
-    return NULL; // In case the size doesn't match any expected types
+    return result;
 }
 
 int main() {
+    // Static allocation for binary string representation
+    char binStr[MAX_BITS + 1]; // +1 for the null terminator
+
     // Example with 32-bit number
     uint32_t x = 0xDEADBEEF;
-    // Convert number to binary string
-    char* binStr = DecToBin(&x, SIZE_OF(x));
-    if (binStr == NULL) {
-        fprintf(stderr, "Failed to convert number to binary string in main function\n");
-        return 1;
-    }
+    DecToBin(&x, SIZE_OF(x), binStr);
     printf("Original value in binary: %s\n", binStr);
     printf("Original value in hex: 0x%X\n", x);
 
-    uint32_t* reversed = (uint32_t*)reverseBits(&x, SIZE_OF(x));
-    if (reversed == NULL) {
+    uint32_t* reversed32 = (uint32_t*)reverseBits(&x, SIZE_OF(x));
+    if (reversed32 == NULL) {
         fprintf(stderr, "Failed to reverse bits in main function\n");
-        free(binStr);
         return 1;
     }
-    // Convert reversed number to binary string
-    char* RevBinStr = DecToBin(reversed, SIZE_OF(*reversed));
-    if (RevBinStr == NULL) {
-        fprintf(stderr, "Failed to convert reversed number to binary string in main function\n");
-        free(binStr);
-        free(reversed);
-        return 1;
-    }
-    printf("Reversed value by bit by bit swapping technique in binary: %s\n", RevBinStr);
-    printf("Reversed value in hex: 0x%X\n", *reversed);
+    DecToBin(reversed32, SIZE_OF(*reversed32), binStr);
+    printf("Reversed value by bit by bit swapping technique in binary: %s\n", binStr);
+    printf("Reversed value in hex: 0x%X\n", *reversed32);
 
     // Free allocated memory
-    free(binStr);
-    free(RevBinStr);
-    free(reversed);
+    free(reversed32);
+    reversed32 = NULL;
 
     // Example with 16-bit number
     uint16_t y = 0xABCD;
-    binStr = DecToBin(&y, SIZE_OF(y));
-    if (binStr == NULL) {
-        fprintf(stderr, "Failed to convert number to binary string in main function\n");
-        return 1;
-    }
+    DecToBin(&y, SIZE_OF(y), binStr);
     printf("Original value (16-bit) in binary: %s\n", binStr);
     printf("Original value (16-bit) in hex: 0x%X\n", y);
 
     uint16_t* reversed16 = (uint16_t*)reverseBits(&y, SIZE_OF(y));
     if (reversed16 == NULL) {
         fprintf(stderr, "Failed to reverse bits in main function\n");
-        free(binStr);
         return 1;
     }
-    RevBinStr = DecToBin(reversed16, SIZE_OF(*reversed16));
-    if (RevBinStr == NULL) {
-        fprintf(stderr, "Failed to convert reversed number to binary string in main function\n");
-        free(binStr);
-        free(reversed16);
-        return 1;
-    }
-    printf("Reversed value (16-bit) by bit by bit swapping technique in binary: %s\n", RevBinStr);
+    DecToBin(reversed16, SIZE_OF(*reversed16), binStr);
+    printf("Reversed value (16-bit) by bit by bit swapping technique in binary: %s\n", binStr);
     printf("Reversed value (16-bit) in hex: 0x%X\n", *reversed16);
 
     // Free allocated memory
-    free(binStr);
-    free(RevBinStr);
     free(reversed16);
+    reversed16 = NULL;
 
     // Example with 8-bit number
     uint8_t z = 0xAB;
-    binStr = DecToBin(&z, SIZE_OF(z));
-    if (binStr == NULL) {
-        fprintf(stderr, "Failed to convert number to binary string in main function\n");
-        return 1;
-    }
+    DecToBin(&z, SIZE_OF(z), binStr);
     printf("Original value (8-bit) in binary: %s\n", binStr);
     printf("Original value (8-bit) in hex: 0x%X\n", z);
 
     uint8_t* reversed8 = (uint8_t*)reverseBits(&z, SIZE_OF(z));
     if (reversed8 == NULL) {
         fprintf(stderr, "Failed to reverse bits in main function\n");
-        free(binStr);
         return 1;
     }
-    RevBinStr = DecToBin(reversed8, SIZE_OF(*reversed8));
-    if (RevBinStr == NULL) {
-        fprintf(stderr, "Failed to convert reversed number to binary string in main function\n");
-        free(binStr);
-        free(reversed8);
-        return 1;
-    }
-    printf("Reversed value (8-bit) by bit by bit swapping technique in binary: %s\n", RevBinStr);
+    DecToBin(reversed8, SIZE_OF(*reversed8), binStr);
+    printf("Reversed value (8-bit) by bit by bit swapping technique in binary: %s\n", binStr);
     printf("Reversed value (8-bit) in hex: 0x%X\n", *reversed8);
 
     // Free allocated memory
-    free(binStr);
-    free(RevBinStr);
     free(reversed8);
+    reversed8 = NULL;
 
     return 0;
 }
