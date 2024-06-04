@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <stdint.h>
-
 
 //Divide 32 bit integer into half and then further half .Reverse the order of halves.
 
@@ -14,27 +11,31 @@
 
 */
 
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
 
-uint32_t swap(uint32_t org_num)
-{
-	
-    uint32_t  h_nibble = 0;
-	uint32_t  l_nibble = 0;
-	
-    h_nibble = org_num >> 16; //0xDEAD
-	l_nibble=  org_num & 0xFFFF; //0xBEEF
-	
-	//0xDEAD =>  0XADDE
-	h_nibble =  (h_nibble >> 8) | (h_nibble & 0xFF00) << 8;
-	//0XBEEF =>  0XEFBE
-	l_nibble =  (l_nibble >> 8) | (l_nibble & 0xFF00) << 8;
-	 
-    uint32_t coverted_num = (l_nibble <<16) | h_nibble;//0XEFBEADDE
-	
-	
+// Function to swap upper and lower halves and then reverse the order of the bytes
+uint32_t swapHalvesAndReverse(uint32_t org_num) {
+    uint32_t upper_half = org_num >> 16; // Extract upper half (0xDEAD)
+    uint32_t lower_half = org_num & 0xFFFF; // Extract lower half (0xBEEF)
+
+    // Swap bytes within each half
+    upper_half = (upper_half >> 8) | ((upper_half & 0xFF) << 8); // 0xDEAD -> 0xADDE
+    lower_half = (lower_half >> 8) | ((lower_half & 0xFF) << 8); // 0xBEEF -> 0xEFBE
+
+    // Combine the swapped halves in reversed order
+    uint32_t converted_num = (lower_half << 16) | upper_half; // 0xEFBEADDE
+    return converted_num;
 }
 
-uint32_t convertLittleToBigEndian(uint32_t orig_hex) {
+// Function to convert a 32-bit integer from little-endian to big-endian (or vice versa)
+uint32_t convertEndian(uint32_t orig_hex) {
+    if (orig_hex == 0) {
+        fprintf(stderr, "Warning: Zero value provided, no conversion needed.\n");
+        return orig_hex;
+    }
+    
     uint32_t ret = 0;
     while (orig_hex != 0) {
         ret <<= 8;
@@ -44,7 +45,13 @@ uint32_t convertLittleToBigEndian(uint32_t orig_hex) {
     return ret;
 }
 
-uint32_t reverseBytesApproach2(uint32_t num) {
+// Another approach to reverse the bytes of a 32-bit integer
+uint32_t reverseBytes(uint32_t num) {
+    if (num == 0) {
+        fprintf(stderr, "Warning: Zero value provided, no reversal needed.\n");
+        return num;
+    }
+
     unsigned char bytes[4];
     bytes[0] = num & 0xFF;
     bytes[1] = (num >> 8) & 0xFF;
@@ -53,38 +60,45 @@ uint32_t reverseBytesApproach2(uint32_t num) {
     return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
 }
 
-
-
 int main() {
     uint32_t x = 0xDEADBEEF;
     unsigned char *c = (unsigned char *)&x;
+
+    if (c == NULL) {
+        fprintf(stderr, "Error: Null pointer encountered for endian check.\n");
+        return 1;
+    }
     
     if (*c == 0xEF)
-        printf("Little endian\n");
+        printf("System is Little Endian\n");
     else
-        printf("Big endian\n");
+        printf("System is Big Endian\n");
     
-    printf("Original value: 0x%x\n", x);
-	
+    printf("Original value: 0x%X\n", x);
+    
     // Convert little-endian to big-endian
-    uint32_t bigEndian = convertLittleToBigEndian(x);
-    printf("After conversion to big-endian: 0x%x\n", bigEndian);
-	
-	// Divide the 32-bit integer into half and then further half
-	uint32_t Reverse_hex = swap(x);
-	printf("After conversion to big-endian: 0x%x\n",Reverse_hex);
-	
-	//Convert the integer into a 4-character array and swap the characters
-	uint32_t Rev_Array = reverseBytesApproach2(x);
-	printf("After conversion to big-endian: 0x%x\n",Rev_Array);
-	
-	
-	
-	return 0;
+    uint32_t bigEndian = convertEndian(x);
+    if (bigEndian == x) {
+        printf("No change in endian conversion: 0x%X\n", bigEndian);
+    } else {
+        printf("After conversion to big-endian: 0x%X\n", bigEndian);
+    }
+    
+    // Divide the 32-bit integer into halves, swap them, and reverse the bytes
+    uint32_t swappedAndReversed = swapHalvesAndReverse(x);
+    if (swappedAndReversed == x) {
+        printf("No change in swap and reverse: 0x%X\n", swappedAndReversed);
+    } else {
+        printf("After swapping halves and reversing: 0x%X\n", swappedAndReversed);
+    }
+    
+    // Convert the integer into a 4-character array and swap the characters
+    uint32_t reversedArray = reverseBytes(x);
+    if (reversedArray == x) {
+        printf("No change in byte reversal: 0x%X\n", reversedArray);
+    } else {
+        printf("After byte reversal: 0x%X\n", reversedArray);
+    }
+    
+    return 0;
 }
-	
-	
-	
-	
-	
-  
