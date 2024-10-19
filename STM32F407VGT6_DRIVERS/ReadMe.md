@@ -43,7 +43,7 @@ I welcome contributions! If you have ideas for new features or improvements, fee
 
 ## 🧪 Testing
 
-Please take the driver for a spin and share any feedback! Whether it’s bugs, suggestions, or just love notes, your input is invaluable in refining this project. ❤️
+Please take the driver for a spin and share any feedback! Whether it’s bugs, suggestions, or just love notes, your input is invaluable in refining this project. 
 
 ## 📄 License
 
