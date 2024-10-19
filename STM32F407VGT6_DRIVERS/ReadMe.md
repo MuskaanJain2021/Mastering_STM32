@@ -37,21 +37,10 @@ Welcome to the I2C Driver repository! This robust driver is your gateway to mast
    Make sure your I2C settings match your device specifications.
 
 
-## 🤝 Contributing
-
-I welcome contributions! If you have ideas for new features or improvements, feel free to fork the repo, create a new branch, and submit a pull request. Let’s make this driver shine! ✨
-
-## 🧪 Testing
-
-Please take the driver for a spin and share any feedback! Whether it’s bugs, suggestions, or just love notes, your input is invaluable in refining this project. 
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE] file for details.
 
-## 🙌 Acknowledgements
-
-A big thank you to everyone in the community for your support and contributions! Together, we can create amazing things. 💪
 
 ## 📞 Contact
 
