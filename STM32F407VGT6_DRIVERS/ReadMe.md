@@ -25,10 +25,10 @@ Welcome to the I2C Driver repository! This robust driver is your gateway to mast
 
 1. Clone the Repository:
 
-  git clone https://github.com/MuskaanJain2021/Mastering_STM32.git
+    git clone https://github.com/MuskaanJain2021/Mastering_STM32.git
 2. Navigate to the I2C Driver Directory:  
    
-   cd Mastering_STM32/STM32F407VGT6_DRIVERS/I2C_DRIVER
+    cd Mastering_STM32/STM32F407VGT6_DRIVERS/I2C_DRIVER
    
 3. Include the Driver:
    Add the driver files to your project in STM32CubeIDE or your chosen development environment.
