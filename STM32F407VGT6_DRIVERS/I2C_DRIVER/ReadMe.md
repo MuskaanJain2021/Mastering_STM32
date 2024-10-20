@@ -1,16 +1,28 @@
-# 🎉 I2C Driver for STM32F407VGT6 🎉
+# I2C Driver for  STM32F407VGT6 
 
-  Welcome to the I2C Driver for STM32F407VGT6! 
-  This driver helps you set up I2C communication on your STM32F407VGT6 microcontroller. Whether you're sending data or controlling devices, it ensures reliable and accurate data transfer. 
+ This project provides an I2C driver for STM32 microcontrollers, enabling communication between the microcontroller and I2C-compatible devices. The driver includes support for both master and slave modes, as well as error handling and DMA integration.
 
-## 🌟 Features
+## Features
 
-- Master & Slave Modes: Easily switch between roles to fit your application needs!
-- Flexible Speed Settings: Choose your I2C clock speed for optimal performance.
-- Data Transmission Made Easy: Send and receive data with simple functions.
-- Interrupt and Polling Support: Pick the method that works best for your project!
-- Error Handling: Built-in checks to keep your data transfers smooth and reliable.
-- Example Projects: Get started quickly with practical examples to guide your implementation.
+- I2C Clock Control: Enables and disables the I2C peripheral clock.
+- I2C Initialization: Configures GPIO pins and sets the I2C operating mode (master/slave).
+- I2C Start and Stop Conditions: Implements the necessary protocols to start and stop I2C communication.
+- I2C Addressing: Supports writing to a specified I2C address with read/write direction.
+- Data Transmission: Facilitates master transmission and slave data reception.
+- Error Checking: Provides functionality to check for I2C error statuses.
+- DMA Support: Allows for DMA configuration to enhance data transmission efficiency.
+- Bus Status Checking: Checks if the I2C bus is currently busy.
+- Acknowledgment Configuration: Configures acknowledgment settings for I2C communication.
+- Reset Functionality: Resets the I2C configuration to default settings.
+
+## Execution Process
+
+1. Compile the Driver: Use the provided Makefile to compile the driver code.
+2. Initialization: Initialize the I2C peripheral with the desired configuration.
+3. Perform I2C Operations: Execute the desired I2C operations (e.g., read, write).
+4. Check for Errors: Monitor for any error statuses during communication.
+5. Clean Up: Disable the I2C clock and reset the configuration if necessary.
+
 
 ## 🚀 Getting Started
 
@@ -38,9 +50,24 @@
    Make sure your I2C settings match your device specifications.
 
 
+## List of Operations
+
+  - Clock Control: Enable/Disable the I2C clock.
+  - Initialization: Set up GPIO pins and configure the I2C peripheral.
+  - Start Condition: Initiate I2C communication.
+  - Stop Condition: Terminate I2C communication.
+  - Addressing: Write to I2C addresses with read/write direction.
+  - Data Transmission: Master and slave data operations.
+  - Error Handling: Check and handle I2C errors.
+  - DMA Operations: Enable/Disable DMA for I2C communication.
+  - Bus Status Check: Verify if the bus is busy.
+  - Acknowledge Configuration: Set acknowledgment settings for data receipt.
+  - Reset Configuration: Reset the I2C settings to defaults.
+
+
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE] file for details.
+  This project is licensed under the MIT License - see the [LICENSE] file for details.
 
 
 ## 📞 Contact
