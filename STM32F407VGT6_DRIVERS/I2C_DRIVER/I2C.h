@@ -43,6 +43,22 @@ typedef struct I2C_SPEED_MODE {
     uint8_t FM_Mode;
 } I2C_SPEED_MODE;
 
+/* I2C Interrupt Control */
+typedef struct I2C_Interrupts{
+	uint16_t Disable;
+	uint16_t Error;
+	uint16_t Event;
+	uint16_t Buffer;
+}I2C_Interrupts;
+
+/* I2C DMA Control */
+typedef struct I2C_DMA_Control{
+	uint8_t Disable;
+	uint8_t TX_DMA_Enable;
+	uint8_t RX_DMA_Enable;
+}I2C_DMA_Control;
+
+
 /* Callback function types */
 typedef void (*I2C_Callback)(void);
 
@@ -61,9 +77,11 @@ typedef struct {
     I2C_SPEED_MODE speed_mode;    // SM or FM mode
     uint16_t ownAddress;          // Used for slave mode
     FunctionalState dmaEnabled;   // DMA enable flag
+    I2C_Interrupts Interrupts;    // Interrupt configuration (Disable, Error, Event, Buffer)
+    I2C_DMA_Control DMA_Control;  // DMA configuration (TX, RX)
     I2C_Callbacks callbacks;      // Callback functions for events
-    uint8_t interruptEnabled;     // Interrupt enable/disable flag
 } I2C_Config;
+
 
 /* Function prototypes */
 /**
@@ -150,14 +168,14 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx);
 void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState);
 
 /**
- * @brief Writes a 10-bit address on I2C bus
+ * @brief Writes a 7-bit address on I2C bus
  *
  * @param I2Cx: I2C peripheral
- * @param address: 10-bit slave address
+ * @param address: 7-bit slave address
  * @param direction: Direction of communication (Read/Write)
  * @return I2C_Status: Status of the operation
  */
-I2C_Status I2C_WriteAddress10Bit(I2C_TypeDef *I2Cx, uint16_t address, uint8_t direction);
+I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t direction);
 
 /**
  * @brief Checks if the bus is busy
