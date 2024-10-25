@@ -126,7 +126,7 @@ void I2C_Init(I2C_Config *config)
     if (config->speed_mode.FM_Mode)
     {
         /* 
-         * Assume APB1 clock = 42 MHz
+         * APB1 clock = 42 MHz
          * I2C Fast Mode formula for CCR:
          *   - Fast mode: T_high + T_low = CCR * (Tpclk1)
          *   - Set CCR value by dividing T_high + T_low by the clock period (Tpclk1 = 1/APB1 clock)
