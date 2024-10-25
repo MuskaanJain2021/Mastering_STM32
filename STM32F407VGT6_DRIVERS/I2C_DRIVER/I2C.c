@@ -57,19 +57,29 @@ void I2C_Clock_Disable(I2C_Config *config)
 /**
  * @brief  Initializes the I2C peripheral based on the provided configuration.
  * @param  config: Pointer to the I2C_Config structure that contains
- *         the configuration information for the I2C peripheral, including mode and GPIO settings.
- * @note   This function sets up the I2C mode (Master/Slave), configures the GPIO pins
- *         for SCL and SDA, and enables the I2C peripheral.
+ *         the configuration information for the I2C peripheral, including mode, speed,
+ *         interrupt settings, DMA settings, and GPIO configurations for the SDA and SCL lines.
+ * 
+ * @note   This function performs several tasks:
+ *         - Enables the clock for the I2C peripheral.
+ *         - Configures the GPIO pins for SDA and SCL lines with alternate function, open-drain mode, and pull-up resistors.
+ *         - Sets the I2C communication speed based on the selected standard or fast mode.
+ *         - Configures the rise time of the I2C signals.
+ *         - Sets the I2C peripheral in Master or Slave mode.
+ *         - Configures interrupts (Error, Event, Buffer) and DMA control if enabled.
+ *         - Enables or disables clock stretching in Slave mode.
+ *         - Enables the I2C peripheral after configuration.
  */
 void I2C_Init(I2C_Config *config)
 {
+    /* Enable the I2C Clock */
     I2C_Clock_Enable(config);
 
-    /* Configure GPIO for SDA and SCL */
+    /* Configure GPIO for SDA and SCL pins */
     if (config->I2Cx == I2C1)
     {
         GPIO_Pin_Init(GPIOB, I2C1_Pins.SCL_PB6.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C1_Pins.SCL_PB6.altFunction);
-        GPIO_Pin_Init(GPIOB, I2C1_Pins.SDA_PB7.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C1_Pins.SDA_PB8.altFunction);
+        GPIO_Pin_Init(GPIOB, I2C1_Pins.SDA_PB7.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C1_Pins.SDA_PB7.altFunction);
     }
     else if (config->I2Cx == I2C2)
     {
@@ -82,17 +92,78 @@ void I2C_Init(I2C_Config *config)
         GPIO_Pin_Init(GPIOC, I2C3_Pins.SDA_PC9.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C3_Pins.SDA_PC9.altFunction);
     }
 
-    /* Set I2C Mode (Master/Slave) */
+    /* Disable I2C Peripheral before making configurations */
+    config->I2Cx->CR1 &= ~I2C_CR1_PE;
+
+    /* Reset the I2C peripheral and disable clock stretching */
+    config->I2Cx->CR1 |= I2C_CR1_SWRST | I2C_CR1_NOSTRETCH;
+    config->I2Cx->CR1 &= ~I2C_CR1_SWRST;
+
+    /* Configure Interrupts (Disable, Error, Event, Buffer) */
+    config->I2Cx->CR2 &= ~(I2C_CR2_ITBUFEN | I2C_CR2_ITERREN | I2C_CR2_ITEVTEN); /* Clear all interrupt bits first */
+    if (config->Interrupts.Disable == 0) /* If interrupts are enabled */
+    {
+        if (config->Interrupts.Buffer)  config->I2Cx->CR2 |= I2C_CR2_ITBUFEN;
+        if (config->Interrupts.Error)   config->I2Cx->CR2 |= I2C_CR2_ITERREN;
+        if (config->Interrupts.Event)   config->I2Cx->CR2 |= I2C_CR2_ITEVTEN;
+    }
+
+    /* Configure DMA (Disable, TX DMA, RX DMA) */
+    config->I2Cx->CR2 &= ~I2C_CR2_DMAEN; // Clear DMA enable bit
+    if (config->DMA_Control.Disable == 0)
+    {
+        if (config->DMA_Control.TX_DMA_Enable || config->DMA_Control.RX_DMA_Enable)
+        {
+            I2C_EnableDMA(config->I2Cx); /* Enable DMA for I2C if TX or RX DMA is enabled */
+        }
+        else
+        {
+            I2C_DisableDMA(config->I2Cx); /* Disable DMA if not needed */
+        }
+    }
+
+    /* Configure I2C Speed Mode (Standard or Fast Mode) */
+    if (config->speed_mode.FM_Mode)
+    {
+        /* 
+         * Assume APB1 clock = 42 MHz
+         * I2C Fast Mode formula for CCR:
+         *   - Fast mode: T_high + T_low = CCR * (Tpclk1)
+         *   - Set CCR value by dividing T_high + T_low by the clock period (Tpclk1 = 1/APB1 clock)
+         *   - Also, enable duty cycle control for fast mode.
+         */
+        config->I2Cx->CR2 = 30; /* APB1 clock frequency is 42 MHz */
+        config->I2Cx->CCR = (1 << 15) | (1 << 14) | 5; /* Fast mode configuration */
+        config->I2Cx->TRISE = 30; /* Maximum rise time for fast mode is configured as 300 ns */
+    }
+    else
+    {
+        /*
+         * Standard Mode I2C Setup:
+         *  - Standard mode CCR calculation: CCR = (APB1_CLK / (2 * I2C_SPEED_STANDARD))
+         *  - TRISE = Maximum rise time (standard mode: 1000 ns)
+         */
+        config->I2Cx->CR2 = 25; /* APB1 clock frequency is 42 MHz */
+        config->I2Cx->CCR = 0x28; /* Standard mode clock control */
+        config->I2Cx->TRISE = 0x8; /* Maximum rise time for standard mode */
+    }
+
+    /* Set I2C Mode (Master or Slave) */
     if (config->mode == I2C_MODE_MASTER)
     {
-        config->I2Cx->CR1 |= I2C_CR1_PE;   // Enable peripheral
-        config->I2Cx->CCR = config->speed; // Set clock speed
+        /* Master mode configuration */
+        config->I2Cx->CCR = config->speed; /* Set clock speed for master mode */
     }
     else if (config->mode == I2C_MODE_SLAVE)
     {
-        config->I2Cx->OAR1 = (config->ownAddress << 1); // Set own address in slave mode
+        /* Slave mode configuration */
+        config->I2Cx->OAR1 = (config->ownAddress << 1); /* Set own address for slave mode */
     }
+
+    /* Enable I2C peripheral after configuration */
+    config->I2Cx->CR1 |= I2C_CR1_PE;
 }
+
 
 /**
  * @brief  Generates an I2C start condition.
