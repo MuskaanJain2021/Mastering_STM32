@@ -159,7 +159,8 @@ void I2C_Init(I2C_Config *config)
         /* Slave mode configuration */
         config->I2Cx->OAR1 = (config->ownAddress << 1); /* Set own address for slave mode */
     }
-
+    /*Disable clock stretching*/
+     config -> I2Cx->CR1|= I2C_CR1_NOSTRETCH;
     /* Enable I2C peripheral after configuration */
     config->I2Cx->CR1 |= I2C_CR1_PE;
 }
@@ -350,6 +351,42 @@ void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState) {
         I2Cx->CR1 |= I2C_CR1_ACK;  // Set the ACK bit in CR1 register to enable acknowledgment.
     } else {
         I2Cx->CR1 &= ~I2C_CR1_ACK; // Clear the ACK bit in CR1 register to disable acknowledgment.
+    }
+}
+/**
+ * @brief  Enables or disables callback events (interrupts) for the I2C peripheral in slave mode.
+ * @param  pI2Cx: Pointer to the I2C peripheral (I2C1, I2C2, or I2C3).
+ * @param  config: Pointer to the I2C_Config structure containing the interrupt configuration.
+ * @param  EnorDi: ENABLE to enable interrupts, DISABLE to disable.
+ * @note   This function uses the I2C_Config structure to selectively enable or disable
+ *         Error, Event, and Buffer interrupts for I2C communication.
+ */
+void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, I2C_Config *config, uint8_t EnorDi)
+{
+    if (EnorDi == ENABLE)
+    {
+        /* Enable Event Interrupt if configured */
+        if (config->Interrupts.Event) 
+            pI2Cx->CR2 |= (1 << I2C_CR2_ITEVTEN);
+
+        /* Enable Buffer Interrupt if configured */
+        if (config->Interrupts.Buffer) 
+            pI2Cx->CR2 |= (1 << I2C_CR2_ITBUFEN);
+
+        /* Enable Error Interrupt if configured */
+        if (config->Interrupts.Error) 
+            pI2Cx->CR2 |= (1 << I2C_CR2_ITERREN);
+    }
+    else // Disable interrupts
+    {
+        /* Disable Event Interrupt */
+        pI2Cx->CR2 &= ~(1 << I2C_CR2_ITEVTEN);
+
+        /* Disable Buffer Interrupt */
+        pI2Cx->CR2 &= ~(1 << I2C_CR2_ITBUFEN);
+
+        /* Disable Error Interrupt */
+        pI2Cx->CR2 &= ~(1 << I2C_CR2_ITERREN);
     }
 }
 
