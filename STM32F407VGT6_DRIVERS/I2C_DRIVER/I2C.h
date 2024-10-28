@@ -76,7 +76,6 @@ typedef struct {
     I2C_Speed speed;              // Standard, Fast, or High-speed mode
     I2C_SPEED_MODE speed_mode;    // SM or FM mode
     uint16_t ownAddress;          // Used for slave mode
-    FunctionalState dmaEnabled;   // DMA enable flag
     I2C_Interrupts Interrupts;    // Interrupt configuration (Disable, Error, Event, Buffer)
     I2C_DMA_Control DMA_Control;  // DMA configuration (TX, RX)
     I2C_Callbacks callbacks;      // Callback functions for events
@@ -213,5 +212,13 @@ void I2C_Reset(I2C_TypeDef *I2Cx);
  * @return I2C_Status: Error status
  */
 I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx);
+/**
+ * @brief Enables or disables specified callback events (interrupts) for the I2C peripheral in slave mode.
+ *
+ * @param pI2Cx: I2C peripheral (I2C1, I2C2, or I2C3)
+ * @param config: Configuration structure with enabled interrupts
+ * @param EnorDi: Set to ENABLE to enable specified events or DISABLE to disable them
+ */
+void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, I2C_Config *config, uint8_t EnorDi);
 
 #endif /* I2C_H_ */
