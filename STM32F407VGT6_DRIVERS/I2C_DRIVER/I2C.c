@@ -365,7 +365,7 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
  */
 I2C_Status I2C_CheckBusBusy(I2C_TypeDef *I2Cx)
 {
-    if (I2Cx->SR2 & I2C_SR2_BUSY)
+    if (READ_BIT(I2Cx->SR2 & I2C_SR2_BUSY))
     {
         return I2C_BUSY;
     }
@@ -387,7 +387,7 @@ I2C_Status I2C_CheckBusBusy(I2C_TypeDef *I2Cx)
  */
 uint8_t I2C_GetFlagStatus(I2C_Config I2Cx, uint32_t flag)
 {
-    if ((I2Cx->SR1 & flag) != 0)
+    if ((READ_BIT(I2Cx->SR1 & flag)) != 0)
     {
         return 1; /*Set the given flag*/
     }
