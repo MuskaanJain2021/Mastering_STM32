@@ -322,7 +322,7 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
     I2C_TypeDef *I2Cx = config->I2Cx;
 
     //check if the device is in the master mode 
-    if (I2Cx->SR2 & (1 << I2C_SR2_MSL))
+    if (I2Cx->SR2 & I2C_SR2_MSL)
     {
         //Device now in master mode
 
