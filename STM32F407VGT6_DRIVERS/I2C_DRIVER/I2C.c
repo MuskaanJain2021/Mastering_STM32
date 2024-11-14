@@ -301,15 +301,15 @@ I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, u
  */
 I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
 {
-    if (READ_BIT(I2Cx->SR1 & I2C_SR1_AF))
+    if (I2Cx->SR1 & I2C_SR1_AF)
     {
         return I2C_ERROR_ACK_FAILURE; // Acknowledge failure
     }
-    if (READ_BIT( I2Cx->SR1 & I2C_SR1_OVR))
+    if (I2Cx->SR1 & I2C_SR1_OVR)
     {
         return I2C_ERROR_OVERRUN; // Overrun error
     }
-    if (READ_BIT(I2Cx->SR1 & I2C_SR1_BERR))
+    if (I2Cx->SR1 & I2C_SR1_BERR)
     {
         return I2C_ERROR_BUS; // Bus error
     }
@@ -337,7 +337,7 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
     
 
     // check if the device is in the master mode
-    if (READ_BIT(I2Cx->SR2, I2C_SR2_MSL))
+    if (I2Cx->SR2, I2C_SR2_MSL)
     {
         // Device now in master mode
 
@@ -365,7 +365,7 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
  */
 I2C_Status I2C_CheckBusBusy(I2C_TypeDef *I2Cx)
 {
-    if (READ_BIT(I2Cx->SR2 & I2C_SR2_BUSY))
+    if (I2Cx->SR2 & I2C_SR2_BUSY)
     {
         return I2C_BUSY;
     }
@@ -387,7 +387,7 @@ I2C_Status I2C_CheckBusBusy(I2C_TypeDef *I2Cx)
  */
 uint8_t I2C_GetFlagStatus(I2C_Config I2Cx, uint32_t flag)
 {
-    if ((READ_BIT(I2Cx->SR1 & flag)) != 0)
+    if ((I2Cx->SR1 & flag) != 0)
     {
         return 1; /*Set the given flag*/
     }
