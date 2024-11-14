@@ -241,9 +241,15 @@ I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t directi
  *         the configuration information for the I2C peripheral.
  * @param  address: 7-bit address of the slave device.
  * @param  data: Pointer to the data to be transmitted.
- * @param  size: Size of the data buffer to be transmitted.
+ * @param  size: Size of the data buffer to be transmitted(no of bytes to transmit).
  * @param  timeout: Timeout value for the transmission.
- * @return I2C_Status: Returns the status of the transmission (I2C_OK, I2C_ERROR).
+ * @return I2C_Status: Returns the status of the transmission.
+ *         - I2C_OK: Transmission successful.
+ *         - I2C_BUSY: I2C bus is busy.
+ *         - I2C_NACK_RECEIVED: NACK received from slave.
+ *         - I2C_ERROR_TIMEOUT: Timeout occurred.
+ *         - I2C_ERROR_BUS: Bus error detected.
+ *         
  * @note   This function transmits data from the master to the specified
  *         slave by writing data byte-by-byte to the I2C data register (DR).
  */
@@ -296,7 +302,7 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
     }
     // Generate Stop Condition
     I2C_Stop(config->I2Cx);
-    
+
     return I2C_OK;
 }
 
@@ -310,12 +316,53 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
  */
 I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, uint32_t timeout)
 {
+    I2C_TypeDef *I2Cx = config->I2Cx;
     while (size--)
     {
-        while (!(config->I2Cx->SR1 & I2C_SR1_RXNE))
-            ;                       // Wait for RXNE (Receive buffer not empty)
-        *data++ = config->I2Cx->DR; // Read data
+        uint32_t RXNE_timeout = timeout;
+        while (!(READ_BIT(config->I2Cx->SR1, I2C_SR1_RXNE))) // Wait for RXNE (Receive buffer not empty)
+        {
+            if (--RXNE_timeout == 0)
+            {
+                return I2C_ERROR_TIMEOUT;
+            }
+            if (READ_BIT(I2Cx->SR1, I2C_SR1_OVR))
+            {
+                return I2C_ERROR_OVERRUN;
+            }
+            // Check for Stop condition
+            if (READ_BIT(I2Cx->SR1, I2C_SR1_STOPF))
+            {
+                // Clear STOPF flag
+                (void)I2Cx->SR1;
+                WRITE_REG(I2Cx->CR1, I2Cx->CR1);
+                return I2C_ERROR_STOP;
+            }
+        }
+        *data++ = READ_REG(I2Cx->DR); // Read data
     }
+    // Wait for Stop condition after receiving data
+    uint32_t STOPF_timeout = timeout;
+    while (!(READ_BIT(I2Cx->SR1, I2C_SR1_STOPF)))
+    {
+        if (--STOPF_timeout == 0)
+        {
+            return I2C_ERROR_TIMEOUT;
+        }
+        // Check for errors
+        if (READ_BIT(I2Cx->SR1, I2C_SR1_OVR))
+        {
+            return I2C_ERROR_OVERRUN;
+        }
+        if (READ_BIT(I2Cx->SR1, I2C_SR1_BERR))
+        {
+            return I2C_ERROR_BUS;
+        }
+    }
+
+    // Clear STOPF flag
+    (void)I2Cx->SR1;
+    WRITE_REG(I2Cx->CR1, I2Cx->CR1);
     return I2C_OK;
 }
 /**
@@ -327,18 +374,23 @@ I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
 {
     if (READ_BIT(I2Cx->SR1, I2C_SR1_AF))
     {
+        // Clear the AF flag by writing 0
+        CLEAR_BIT(I2Cx->SR1, I2C_SR1_AF);
         return I2C_ERROR_ACK_FAILURE; // Acknowledge failure
     }
     if (READ_BIT(I2Cx->SR1, I2C_SR1_OVR))
     {
+        CLEAR_BIT(I2Cx->SR1, I2C_SR1_OVR);
         return I2C_ERROR_OVERRUN; // Overrun error
     }
     if (READ_BIT(I2Cx->SR1, I2C_SR1_ARLO))
     {
+        CLEAR_BIT(I2Cx->SR1, I2C_SR1_ARLO);
         return I2C_ERROR_ARBITRATION_LOST; // arbitration loss error
     }
     if (READ_BIT(I2Cx->SR1, I2C_SR1_BERR))
     {
+        CLEAR_BIT(I2Cx->SR1, I2C_SR1_BERR);
         return I2C_ERROR_BUS; // bus error
     }
     return I2C_OK; // No error
