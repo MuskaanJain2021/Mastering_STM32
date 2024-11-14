@@ -231,7 +231,7 @@ I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t directi
         ;                    // Wait until the address is sent/acknowledgemet of addr
 
     I2C_ClearADDRFlag(I2Cx); // Clear the ADDR flag
-    
+
     return I2C_OK;
 }
 
@@ -249,6 +249,7 @@ I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t directi
  */
 I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8_t *data, uint16_t size, uint32_t timeout)
 {
+    I2C_TypeDef *I2Cx = config->I2Cx;
     I2C_Status status;
     status = I2C_Start(config->I2Cx);
     if (status != I2C_OK)
@@ -336,7 +337,7 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
     I2C_TypeDef *I2Cx = config->I2Cx;
 
     // check if the device is in the master mode
-    if (I2Cx->SR2 & I2C_SR2_MSL)
+    if (READ_BIT(I2Cx->SR2, I2C_SR2_MSL))
     {
         // Device now in master mode
 
