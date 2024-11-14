@@ -262,17 +262,41 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
         I2C_Stop(config->I2Cx);
         return status;
     }
-    uint32_t TXE_timeout = timeout;
+
     for (uint16_t i = 0; i < size; i++)
     {
-        config->I2Cx->DR = data[i];
-        while (!(config->I2Cx->SR1 & I2C_SR1_TXE))
+        uint32_t TXE_timeout = timeout; // Reset timeout for each byte
+        WRITE_REG(I2Cx->DR, data[i]);   // Write data to DR
+
+        while (!(READ_BIT(I2Cx->SR1 & I2C_SR1_TXE)))
         {
             if (--TXE_timeout == 0)
-                I2C_Stop(config->I2Cx);
+            {
+                I2C_Stop(I2Cx);
+                return I2C_TIMEOUT
+            }
+            // Error Check
+            if (READ_BIT(I2Cx->SR1, I2C_SR1_AF))
+            {
+                I2C_Stop(I2Cx);
+                return I2C_NACK_RECEIVED;
+            }
         }
     }
+
+    // Wait until BTF flag is set
+    uint32_t BTF_timeout = timeout;
+    while (!(READ_BIT(O2C->SR1, I2C_SR1_BTF)))
+    {
+        if (BTF_timeout == 0)
+        {
+            I2C_Stop(I2Cx);
+            return I2C_TIMEOUT
+        }
+    }
+    // Generate Stop Condition
     I2C_Stop(config->I2Cx);
+    
     return I2C_OK;
 }
 
