@@ -12,7 +12,8 @@
 #include "GPIO.h"
 #include "I2C_Def.h"
 #include "DMA.h"
-
+#include <stm32f4xx.h>
+#include <stm32f407xx.h> 
 /* Error codes */
 typedef enum
 {
@@ -46,6 +47,13 @@ typedef struct I2C_SPEED_MODE
     uint8_t SM_Mode;
     uint8_t FM_Mode;
 } I2C_SPEED_MODE;
+/* I2C Operation States */
+typedef enum
+{
+    I2C_READY = 0,           // I2C is ready
+    I2C_BUSY_IN_TX,          // I2C is busy in transmission
+    I2C_BUSY_IN_RX           // I2C is busy in reception
+} I2C_State;
 
 /* I2C Interrupt Control */
 typedef struct I2C_Interrupts
@@ -86,6 +94,10 @@ typedef struct
     I2C_Interrupts Interrupts;   // Interrupt configuration (Disable, Error, Event, Buffer)
     I2C_DMA_Control DMA_Control; // DMA configuration (TX, RX)
     I2C_Callbacks callbacks;     // Callback functions for events
+    uint8_t TxRxState;           //Transmission/Reception State
+    uint16_t Rxsize;             //Size of recieved data
+    uint16_t Txsize;             //size of data to be transmitted 
+
 } I2C_Config;
 
 /* Function prototypes */
