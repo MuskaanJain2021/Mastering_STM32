@@ -301,21 +301,21 @@ I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, u
  */
 I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
 {
-    if (READ_BIT(I2Cx->SR1 ,I2C_SR1_AF))
+    if (READ_BIT(I2Cx->SR1, I2C_SR1_AF))
     {
         return I2C_ERROR_ACK_FAILURE; // Acknowledge failure
     }
     if (READ_BIT(I2Cx->SR1, I2C_SR1_OVR))
     {
-        return I2C_ERROR_OVERRUN;//Overrun error
+        return I2C_ERROR_OVERRUN; // Overrun error
     }
     if (READ_BIT(I2Cx->SR1, I2C_SR1_ARLO))
     {
-        return I2C_ERROR_ARBITRATION_LOST;//arbitration loss error
+        return I2C_ERROR_ARBITRATION_LOST; // arbitration loss error
     }
     if (READ_BIT(I2Cx->SR1, I2C_SR1_BERR))
     {
-        return I2C_ERROR_BUS;//bus error
+        return I2C_ERROR_BUS; // bus error
     }
     return I2C_OK; // No error
 }
@@ -340,7 +340,7 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
 {
 
     // check if the device is in the master mode
-    if (I2Cx->SR2, I2C_SR2_MSL)
+    if (READ_BIT(I2Cx->SR2, I2C_SR2_MSL))
     {
         // Device now in master mode
 
@@ -368,7 +368,7 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
  */
 I2C_Status I2C_CheckBusBusy(I2C_TypeDef *I2Cx)
 {
-    if (I2Cx->SR2 & I2C_SR2_BUSY)
+    if (READ_BIT(I2Cx->SR2, I2C_SR2_BUSY))
     {
         return I2C_BUSY;
     }
@@ -390,7 +390,7 @@ I2C_Status I2C_CheckBusBusy(I2C_TypeDef *I2Cx)
  */
 uint8_t I2C_GetFlagStatus(I2C_Config I2Cx, uint32_t flag)
 {
-    if ((I2Cx->SR1 & flag) != 0)
+    if (READ_BIT(I2Cx->SR1, flag) != 0)
     {
         return 1; /*Set the given flag*/
     }
@@ -409,7 +409,7 @@ uint8_t I2C_GetFlagStatus(I2C_Config I2Cx, uint32_t flag)
 void I2C_DisableDMA(I2C_TypeDef *I2Cx)
 {
     /* Clear DMAEN bit in CR2 register to disable DMA requests */
-    I2Cx->CR2 &= ~I2C_CR2_DMAEN;
+    CLEAR_BIT(I2Cx->CR2, I2C_CR2_DMAEN);
 }
 
 /**
@@ -421,7 +421,7 @@ void I2C_DisableDMA(I2C_TypeDef *I2Cx)
 void I2C_EnableDMA(I2C_TypeDef *I2Cx)
 {
     /* Set DMAEN bit in CR2 register to enable DMA requests */
-    I2Cx->CR2 |= I2C_CR2_DMAEN;
+    SET_BIT(I2Cx->CR2, I2C_CR2_DMAEN);
 }
 
 /**
@@ -449,11 +449,11 @@ void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState)
 {
     if (NewState == ENABLE)
     {
-        I2Cx->CR1 |= I2C_CR1_ACK; // Set the ACK bit in CR1 register to enable acknowledgment.
+        SET_BIT(I2Cx->CR1, I2C_CR1_ACK); // Set the ACK bit in CR1 register to enable acknowledgment.
     }
     else
     {
-        I2Cx->CR1 &= ~I2C_CR1_ACK; // Clear the ACK bit in CR1 register to disable acknowledgment.
+        CLEAR_BIT(I2Cx->CR1, I2C_CR1_ACK); // Clear the ACK bit in CR1 register to disable acknowledgment.
     }
 }
 /**
@@ -470,26 +470,26 @@ void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, I2C_Config *confi
     {
         /* Enable Event Interrupt if configured */
         if (config->Interrupts.Event)
-            pI2Cx->CR2 |= (1 << I2C_CR2_ITEVTEN);
+            SET_BIT(pI2Cx->CR2, I2C_CR2_ITEVTEN);
 
         /* Enable Buffer Interrupt if configured */
         if (config->Interrupts.Buffer)
-            pI2Cx->CR2 |= (1 << I2C_CR2_ITBUFEN);
+            SET_BIT(pI2Cx->CR2, I2C_CR2_ITBUFEN);
 
         /* Enable Error Interrupt if configured */
         if (config->Interrupts.Error)
-            pI2Cx->CR2 |= (1 << I2C_CR2_ITERREN);
+            SET_BIT(pI2Cx->CR2, I2C_CR2_ITERREN);
     }
     else // Disable interrupts
     {
         /* Disable Event Interrupt */
-        pI2Cx->CR2 &= ~(1 << I2C_CR2_ITEVTEN);
+        CLEAR_BIT(pI2Cx->CR2, I2C_CR2_ITEVTEN);
 
         /* Disable Buffer Interrupt */
-        pI2Cx->CR2 &= ~(1 << I2C_CR2_ITBUFEN);
+        CLEAR_BIT(pI2Cx->CR2, I2C_CR2_ITBUFEN);
 
         /* Disable Error Interrupt */
-        pI2Cx->CR2 &= ~(1 << I2C_CR2_ITERREN);
+        CLEAR_BIT(pI2Cx->CR2, I2C_CR2_ITERREN);
     }
 }
 
