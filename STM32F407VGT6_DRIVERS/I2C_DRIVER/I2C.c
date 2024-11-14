@@ -301,15 +301,15 @@ I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, u
  */
 I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
 {
-    if (I2Cx->SR1 & I2C_SR1_AF)
+    if (READ_BIT(I2Cx->SR1 & I2C_SR1_AF))
     {
         return I2C_ERROR_ACK_FAILURE; // Acknowledge failure
     }
-    if (I2Cx->SR1 & I2C_SR1_OVR)
+    if (READ_BIT( I2Cx->SR1 & I2C_SR1_OVR))
     {
         return I2C_ERROR_OVERRUN; // Overrun error
     }
-    if (I2Cx->SR1 & I2C_SR1_BERR)
+    if (READ_BIT(I2Cx->SR1 & I2C_SR1_BERR))
     {
         return I2C_ERROR_BUS; // Bus error
     }
