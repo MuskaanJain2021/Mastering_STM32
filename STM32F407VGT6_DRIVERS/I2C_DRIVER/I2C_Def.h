@@ -9,8 +9,8 @@
 #define I2C_DEF_H_
 
 #include "main.h"
-#define I2C_READ  1
-#define I2C_WRITE 0
+#define I2C_READ    1
+#define I2C_WRITE   0
 /* Structure to hold I2C Pin configuration */
 typedef struct {
     uint8_t pinNumber;       // GPIO Pin number
