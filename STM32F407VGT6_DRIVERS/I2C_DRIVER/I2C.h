@@ -17,13 +17,14 @@
 /* Error codes */
 typedef enum
 {
-    I2C_OK,
-    I2C_ERROR,
-    I2C_BUSY,
-    I2C_TIMEOUT,
-    I2C_NACK_RECEIVED,
+    I2C_OK, // Operation completed successfully
+    I2C_ERROR_STOP,// Stop condition error
+    I2C_BUSY, // I2C bus is busy
+    I2C_ERROR_TIMEOUT, // Specific timeout error during an operation
+    I2C_NACK_RECEIVED,   // NACK received after address or data byte
+    I2C_ERROR_OVERRUN, // Data overrun/underrun error
     I2C_ARBITRATION_LOST, // Arbitration lost in master mode
-    I2C_BUS_ERROR         // Hardware-related bus error
+    I2C_ERROR_BUS         // Hardware-related bus error
 } I2C_Status;
 
 /* I2C Speeds */
@@ -160,7 +161,7 @@ I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t directi
  * @return uint8_t: 1 if the flag is set, 0 if the flag is reset.
  */
 
-uint8_t I2C_GetFlagStatus(I2C_TypeDef *I2Cx, uint32_t flag);
+//uint8_t I2C_GetFlagStatus(I2C_TypeDef *I2Cx, uint32_t flag);
 /**
  * @brief Master transmit data
  *
