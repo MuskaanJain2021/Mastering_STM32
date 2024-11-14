@@ -225,10 +225,10 @@ I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t directi
         config->TxRxState = I2C_BUSY_IN_TX;
     }
 
-   // Send a 7-bit address  with direction bit
+    // Send a 7-bit address  with direction bit
     WRITE_REG(I2CX->DR = (address << 1) | direction); /* Send the 7-bit address and the direction bit */
     while (!READ_BIT(I2Cx->SR1 & I2C_SR1_ADDR))
-        ;                    // Wait until the address is sent/acknowledgemet of addr
+        ; // Wait until the address is sent/acknowledgemet of addr
 
     I2C_ClearADDRFlag(I2Cx); // Clear the ADDR flag
 
@@ -301,17 +301,21 @@ I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, u
  */
 I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
 {
-    if (I2Cx->SR1 & I2C_SR1_AF)
+    if (READ_BIT(I2Cx->SR1 ,I2C_SR1_AF))
     {
         return I2C_ERROR_ACK_FAILURE; // Acknowledge failure
     }
-    if (I2Cx->SR1 & I2C_SR1_OVR)
+    if (READ_BIT(I2Cx->SR1, I2C_SR1_OVR))
     {
-        return I2C_ERROR_OVERRUN; // Overrun error
+        return I2C_ERROR_OVERRUN;//Overrun error
     }
-    if (I2Cx->SR1 & I2C_SR1_BERR)
+    if (READ_BIT(I2Cx->SR1, I2C_SR1_ARLO))
     {
-        return I2C_ERROR_BUS; // Bus error
+        return I2C_ERROR_ARBITRATION_LOST;//arbitration loss error
+    }
+    if (READ_BIT(I2Cx->SR1, I2C_SR1_BERR))
+    {
+        return I2C_ERROR_BUS;//bus error
     }
     return I2C_OK; // No error
 }
@@ -334,7 +338,6 @@ I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
  */
 void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
 {
-    
 
     // check if the device is in the master mode
     if (I2Cx->SR2, I2C_SR2_MSL)
