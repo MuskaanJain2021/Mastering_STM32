@@ -9,6 +9,8 @@
 #include "I2C_Def.h"
 #include "GPIO.h"
 
+extern I2C_Config config;
+
 /**
  * @brief  Enables the clock for the specified I2C peripheral.
  * @param  config: Pointer to the I2C_Config structure that contains
@@ -59,7 +61,7 @@ void I2C_Clock_Disable(I2C_Config *config)
  * @param  config: Pointer to the I2C_Config structure that contains
  *         the configuration information for the I2C peripheral, including mode, speed,
  *         interrupt settings, DMA settings, and GPIO configurations for the SDA and SCL lines.
- * 
+ *
  * @note   This function performs several tasks:
  *         - Enables the clock for the I2C peripheral.
  *         - Configures the GPIO pins for SDA and SCL lines with alternate function, open-drain mode, and pull-up resistors.
@@ -101,11 +103,14 @@ void I2C_Init(I2C_Config *config)
 
     /* Configure Interrupts (Disable, Error, Event, Buffer) */
     config->I2Cx->CR2 &= ~(I2C_CR2_ITBUFEN | I2C_CR2_ITERREN | I2C_CR2_ITEVTEN); /* Clear all interrupt bits first */
-    if (config->Interrupts.Disable == 0) /* If interrupts are enabled */
+    if (config->Interrupts.Disable == 0)                                         /* If interrupts are enabled */
     {
-        if (config->Interrupts.Buffer)  config->I2Cx->CR2 |= I2C_CR2_ITBUFEN;
-        if (config->Interrupts.Error)   config->I2Cx->CR2 |= I2C_CR2_ITERREN;
-        if (config->Interrupts.Event)   config->I2Cx->CR2 |= I2C_CR2_ITEVTEN;
+        if (config->Interrupts.Buffer)
+            config->I2Cx->CR2 |= I2C_CR2_ITBUFEN;
+        if (config->Interrupts.Error)
+            config->I2Cx->CR2 |= I2C_CR2_ITERREN;
+        if (config->Interrupts.Event)
+            config->I2Cx->CR2 |= I2C_CR2_ITEVTEN;
     }
 
     /* Configure DMA (Disable, TX DMA, RX DMA) */
@@ -125,16 +130,16 @@ void I2C_Init(I2C_Config *config)
     /* Configure I2C Speed Mode (Standard or Fast Mode) */
     if (config->speed_mode.FM_Mode)
     {
-        /* 
+        /*
          * APB1 clock = 42 MHz
          * I2C Fast Mode formula for CCR:
          *   - Fast mode: T_high + T_low = CCR * (Tpclk1)
          *   - Set CCR value by dividing T_high + T_low by the clock period (Tpclk1 = 1/APB1 clock)
          *   - Also, enable duty cycle control for fast mode.
          */
-        config->I2Cx->CR2 = 30; /* APB1 clock frequency is 42 MHz */
+        config->I2Cx->CR2 = 30;                        /* APB1 clock frequency is 42 MHz */
         config->I2Cx->CCR = (1 << 15) | (1 << 14) | 5; /* Fast mode configuration */
-        config->I2Cx->TRISE = 30; /* Maximum rise time for fast mode is configured as 300 ns */
+        config->I2Cx->TRISE = 30;                      /* Maximum rise time for fast mode is configured as 300 ns */
     }
     else
     {
@@ -143,8 +148,8 @@ void I2C_Init(I2C_Config *config)
          *  - Standard mode CCR calculation: CCR = (APB1_CLK / (2 * I2C_SPEED_STANDARD))
          *  - TRISE = Maximum rise time (standard mode: 1000 ns)
          */
-        config->I2Cx->CR2 = 25; /* APB1 clock frequency is 42 MHz */
-        config->I2Cx->CCR = 0x28; /* Standard mode clock control */
+        config->I2Cx->CR2 = 25;    /* APB1 clock frequency is 42 MHz */
+        config->I2Cx->CCR = 0x28;  /* Standard mode clock control */
         config->I2Cx->TRISE = 0x8; /* Maximum rise time for standard mode */
     }
 
@@ -160,23 +165,31 @@ void I2C_Init(I2C_Config *config)
         config->I2Cx->OAR1 = (config->ownAddress << 1); /* Set own address for slave mode */
     }
     /*Disable clock stretching*/
-     config -> I2Cx->CR1|= I2C_CR1_NOSTRETCH;
+    config->I2Cx->CR1 |= I2C_CR1_NOSTRETCH;
     /* Enable I2C peripheral after configuration */
     config->I2Cx->CR1 |= I2C_CR1_PE;
 }
 
-
 /**
  * @brief  Generates an I2C start condition.
  * @param  I2Cx: Pointer to the I2C peripheral (I2C1, I2C2, I2C3).
+ * @retval 0 if successful, -1 if timeout occurs.
  * @note   This function sets the START bit in the CR1 register to initiate
  *         communication and waits until the start condition is generated.
  */
-void I2C_Start(I2C_TypeDef *I2Cx)
+int I2C_Start(I2C_TypeDef *I2Cx)
 {
-    I2Cx->CR1 |= I2C_CR1_START; /* Set the START bit to begin communication */
-    while (!(I2Cx->SR1 & I2C_SR1_SB))
-        ; // Wait for the start bit to be set
+    int timeout = 1000;               // Correct variable name
+    I2Cx->CR1 |= I2C_CR1_START;       /* Set the START bit to begin communication */
+    while (!(I2Cx->SR1 & I2C_SR1_SB)) // Wait for the start bit to be set
+    {
+        if (timeout == 0)
+        {
+            return -1; // Return error code on timeout
+        }
+        timeout--; // Decrement timeout counter
+    }
+    return 0; // Return success code
 }
 
 /**
@@ -222,13 +235,27 @@ I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t directi
  */
 I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8_t *data, uint16_t size, uint32_t timeout)
 {
-    I2C_Start(config->I2Cx);
-    I2C_WriteAddress(config->I2Cx, address, I2C_Direction_Transmitter);
+    I2C_Status status;
+    status = I2C_Start(config->I2Cx);
+    if (status != I2C_OK)
+    {
+        return status;
+    }
+    status = I2C_WriteAddress(config->I2Cx, address, I2C_Direction_Transmitter);
+    if (status != I2C_OK)
+    {
+        I2C_Stop(config->I2Cx);
+        return status;
+    }
+    uint32_t TXE_timeout = timeout;
     for (uint16_t i = 0; i < size; i++)
     {
         config->I2Cx->DR = data[i];
         while (!(config->I2Cx->SR1 & I2C_SR1_TXE))
-            ; // Wait for TXE (Transmit buffer empty)
+        {
+            if (--TXE_timeout == 0)
+                I2C_Stop(config->I2Cx);
+        }
     }
     I2C_Stop(config->I2Cx);
     return I2C_OK;
@@ -295,11 +322,45 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
     (void)I2Cx->SR1; // Read SR1 to clear the ADDR flag
     (void)I2Cx->SR2; // Read SR2 to complete the clearing process
 }
+/**
+ * @brief  Checks if the bus is busy
+ *
+ * @param  I2Cx: I2C peripheral
+ * @return I2C_Status: Status of the bus
+ */
+I2C_Status I2C_CheckBusBusy(I2C_TypeDef *I2Cx)
+{
+    if (I2Cx->SR2 & I2C_SR2_BUSY)
+    {
+        return I2C_BUSY;
+    }
+    return I2C_OK;
+}
 
-// /* Enable DMA for I2C */
-// void I2C_EnableDMA(I2C_Config *config) {
-//     config->I2Cx->CR2 |= I2C_CR2_DMAEN;
-// }
+/**
+ * @brief Checks the status of the specified I2C flag.
+ * @param I2Cx: Pointer to the I2C peripheral (I2C1, I2C2, or I2C3).
+ * @param flag: The I2C flag to check. Example flags:
+ *         - I2C_SR1_TXE: Transmit buffer empty
+ *         - I2C_SR1_RXNE: Receive buffer not empty
+ *         - I2C_SR1_BTF: Byte transfer finished
+ *         - I2C_SR1_ADDR: Address matched
+ *         - I2C_SR1_STOPF: Stop condition detected
+ *         - I2C_SR1_SB: Start bit generated
+ *         - I2C_SR1_AF: Acknowledge failure
+ * @return uint8_t: 1 if the flag is set, 0 if the flag is reset.
+ */
+uint8_t I2C_GetFlagStatus(I2C_Config I2Cx, uint32_t flag)
+{
+    if ((I2Cx->SR1 & flag) != 0)
+    {
+        return 1; /*Set the given flag*/
+    }
+    else
+    {
+        return 0; /*Reset the given flag*/
+    }
+}
 
 /**
  * @brief  Disables DMA requests for I2C data transfer.
@@ -313,7 +374,7 @@ void I2C_DisableDMA(I2C_TypeDef *I2Cx)
     I2Cx->CR2 &= ~I2C_CR2_DMAEN;
 }
 
-**
+/**
  * @brief  Enables DMA requests for I2C data transfer.
  * @param  I2Cx: Pointer to the I2C peripheral (I2C1, I2C2, I2C3).
  * @note   This function sets the DMAEN bit in the CR2 register to allow
@@ -328,8 +389,8 @@ void I2C_EnableDMA(I2C_TypeDef *I2Cx)
 /**
  * @brief Configure the acknowledgment state for the I2C peripheral.
  *
- * This function enables or disables the acknowledgment (ACK) feature in the 
- * I2C communication. When enabled, the I2C peripheral will send an ACK bit 
+ * This function enables or disables the acknowledgment (ACK) feature in the
+ * I2C communication. When enabled, the I2C peripheral will send an ACK bit
  * after receiving a byte of data. When disabled, it will send a NACK bit instead.
  *
  * @param I2Cx Pointer to the I2C peripheral base address.
@@ -340,16 +401,20 @@ void I2C_EnableDMA(I2C_TypeDef *I2Cx)
  *                 - ENABLE: Enable acknowledgment.
  *                 - DISABLE: Disable acknowledgment.
  *
- * @note 
- *  - This function should be called before starting a data transfer to 
+ * @note
+ *  - This function should be called before starting a data transfer to
  *    ensure the acknowledgment state is set correctly.
- *  - Acknowledgment is crucial in I2C communication to confirm data reception 
+ *  - Acknowledgment is crucial in I2C communication to confirm data reception
  *    between the master and slave devices.
  */
-void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState) {
-    if (NewState == ENABLE) {
-        I2Cx->CR1 |= I2C_CR1_ACK;  // Set the ACK bit in CR1 register to enable acknowledgment.
-    } else {
+void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState)
+{
+    if (NewState == ENABLE)
+    {
+        I2Cx->CR1 |= I2C_CR1_ACK; // Set the ACK bit in CR1 register to enable acknowledgment.
+    }
+    else
+    {
         I2Cx->CR1 &= ~I2C_CR1_ACK; // Clear the ACK bit in CR1 register to disable acknowledgment.
     }
 }
@@ -366,15 +431,15 @@ void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, I2C_Config *confi
     if (EnorDi == ENABLE)
     {
         /* Enable Event Interrupt if configured */
-        if (config->Interrupts.Event) 
+        if (config->Interrupts.Event)
             pI2Cx->CR2 |= (1 << I2C_CR2_ITEVTEN);
 
         /* Enable Buffer Interrupt if configured */
-        if (config->Interrupts.Buffer) 
+        if (config->Interrupts.Buffer)
             pI2Cx->CR2 |= (1 << I2C_CR2_ITBUFEN);
 
         /* Enable Error Interrupt if configured */
-        if (config->Interrupts.Error) 
+        if (config->Interrupts.Error)
             pI2Cx->CR2 |= (1 << I2C_CR2_ITERREN);
     }
     else // Disable interrupts
@@ -390,7 +455,6 @@ void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, I2C_Config *confi
     }
 }
 
-
 /**
  * @brief Resets the I2C peripheral configuration to default values.
  *
@@ -403,10 +467,14 @@ void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, I2C_Config *confi
 void I2C_Reset(I2C_Config *config)
 {
     /* Set I2C speed mode to Fast Mode (FM_Mode) */
-    config->Speed_Mode = Speed_Mode.FM_Mode;
+    config->speed_mode.SM_Mode = 0;
+    config->speed_mode.FM_Mode = 1;
 
     /* Disable interrupts */
-    config->Interrupts = Interrupts.Disable;
+    config->Interrupts.Disable = 1;
+    config->Interrupts.Error = 0;
+    config->Interrupts.Event = 0;
+    config->Interrupts.Buffer = 0;
 
     /* Set I2C mode to Master */
     config->mode = I2C_MODE_MASTER;
