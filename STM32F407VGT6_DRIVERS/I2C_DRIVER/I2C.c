@@ -185,7 +185,7 @@ int I2C_Start(I2C_TypeDef *I2Cx)
     {
         if (timeout == 0)
         {
-            return -1; // Return error code on timeout
+            return I2C_ERROR_TIMEOUT; // Return error code on timeout
         }
         timeout--; // Decrement timeout counter
     }
