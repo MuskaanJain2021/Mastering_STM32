@@ -1,7 +1,7 @@
 /*
  * I2C.h
  *
- *  
+ *
  *  Author: muskaan jain
  */
 
@@ -14,73 +14,79 @@
 #include "DMA.h"
 
 /* Error codes */
-typedef enum {
+typedef enum
+{
     I2C_OK,
     I2C_ERROR,
     I2C_BUSY,
     I2C_TIMEOUT,
     I2C_NACK_RECEIVED,
-    I2C_ARBITRATION_LOST,    // Arbitration lost in master mode
-    I2C_BUS_ERROR            // Hardware-related bus error
+    I2C_ARBITRATION_LOST, // Arbitration lost in master mode
+    I2C_BUS_ERROR         // Hardware-related bus error
 } I2C_Status;
 
 /* I2C Speeds */
-typedef enum {
-    I2C_SPEED_STANDARD = 100000,   // 100kHz
-    I2C_SPEED_FAST = 400000,       // 400kHz
-    I2C_SPEED_HIGH = 1000000       // 1MHz
+typedef enum
+{
+    I2C_SPEED_STANDARD = 100000, // 100kHz
+    I2C_SPEED_FAST = 400000,     // 400kHz
+    I2C_SPEED_HIGH = 1000000     // 1MHz
 } I2C_Speed;
 
 /* I2C Modes */
-typedef enum {
+typedef enum
+{
     I2C_MODE_MASTER,
     I2C_MODE_SLAVE
 } I2C_Mode;
 
 /* Mode of operation: Standard or Fast Mode */
-typedef struct I2C_SPEED_MODE {
+typedef struct I2C_SPEED_MODE
+{
     uint8_t SM_Mode;
     uint8_t FM_Mode;
 } I2C_SPEED_MODE;
 
 /* I2C Interrupt Control */
-typedef struct I2C_Interrupts{
-	uint16_t Disable;
-	uint16_t Error;
-	uint16_t Event;
-	uint16_t Buffer;
-}I2C_Interrupts;
+typedef struct I2C_Interrupts
+{
+    uint16_t Disable;
+    uint16_t Error;
+    uint16_t Event;
+    uint16_t Buffer;
+} I2C_Interrupts;
 
 /* I2C DMA Control */
-typedef struct I2C_DMA_Control{
-	uint8_t Disable;
-	uint8_t TX_DMA_Enable;
-	uint8_t RX_DMA_Enable;
-}I2C_DMA_Control;
-
+typedef struct I2C_DMA_Control
+{
+    uint8_t Disable;
+    uint8_t TX_DMA_Enable;
+    uint8_t RX_DMA_Enable;
+} I2C_DMA_Control;
 
 /* Callback function types */
 typedef void (*I2C_Callback)(void);
 
 /* I2C Callback Structure */
-typedef struct {
-    I2C_Callback onTransmitComplete;   // Callback for transmission completion
-    I2C_Callback onReceiveComplete;    // Callback for reception completion
-    I2C_Callback onError;              // Callback for error handling
+typedef struct
+{
+    I2C_Callback onTransmitComplete; // Callback for transmission completion
+    I2C_Callback onReceiveComplete;  // Callback for reception completion
+    I2C_Callback onError;            // Callback for error handling
 } I2C_Callbacks;
 
 /* I2C Configuration structure */
-typedef struct {
-    I2C_TypeDef *I2Cx;            // I2C peripheral (I2C1, I2C2, or I2C3)
-    I2C_Mode mode;                // Master or Slave mode
-    I2C_Speed speed;              // Standard, Fast, or High-speed mode
-    I2C_SPEED_MODE speed_mode;    // SM or FM mode
-    uint16_t ownAddress;          // Used for slave mode
-    I2C_Interrupts Interrupts;    // Interrupt configuration (Disable, Error, Event, Buffer)
-    I2C_DMA_Control DMA_Control;  // DMA configuration (TX, RX)
-    I2C_Callbacks callbacks;      // Callback functions for events
+typedef struct
+{
+    I2C_TypeDef *I2Cx;           // I2C peripheral (I2C1, I2C2, or I2C3)
+    I2C_Mode mode;               // Master or Slave mode
+    I2C_Speed speed;             // Standard, Fast, or High-speed mode
+    I2C_SPEED_MODE speed_mode;   // SM or FM mode
+    uint16_t ownAddress;         // Used for slave mode
+    I2C_Interrupts Interrupts;   // Interrupt configuration (Disable, Error, Event, Buffer)
+    I2C_DMA_Control DMA_Control; // DMA configuration (TX, RX)
+    I2C_Callbacks callbacks;     // Callback functions for events
 } I2C_Config;
-
 
 /* Function prototypes */
 /**
@@ -109,7 +115,7 @@ void I2C_Clock_Disable(I2C_Config *config);
  *
  * @param I2Cx: I2C peripheral (I2C1, I2C2, I2C3)
  */
-void I2C_Start(I2C_TypeDef *I2Cx);
+int I2C_Start(I2C_TypeDef *I2Cx);
 
 /**
  * @brief Stops I2C communication
@@ -128,6 +134,21 @@ void I2C_Stop(I2C_TypeDef *I2Cx);
  */
 I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t direction);
 
+/**
+ * @brief Checks the status of the specified I2C flag.
+ * @param I2Cx: Pointer to the I2C peripheral (I2C1, I2C2, or I2C3).
+ * @param flag: The I2C flag to check. Example flags:
+ *         - I2C_SR1_TXE: Transmit buffer empty
+ *         - I2C_SR1_RXNE: Receive buffer not empty
+ *         - I2C_SR1_BTF: Byte transfer finished
+ *         - I2C_SR1_ADDR: Address matched
+ *         - I2C_SR1_STOPF: Stop condition detected
+ *         - I2C_SR1_SB: Start bit generated
+ *         - I2C_SR1_AF: Acknowledge failure
+ * @return uint8_t: 1 if the flag is set, 0 if the flag is reset.
+ */
+
+uint8_t I2C_GetFlagStatus(I2C_TypeDef *I2Cx, uint32_t flag);
 /**
  * @brief Master transmit data
  *
@@ -212,6 +233,24 @@ void I2C_Reset(I2C_TypeDef *I2Cx);
  * @return I2C_Status: Error status
  */
 I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx);
+/**
+ * @brief  Transmits data as a slave to the master in Slave Transmit Mode.
+ * @param  config: Pointer to the I2C_Config structure that contains
+ *         the configuration information for the I2C peripheral.
+ * @param  data: Pointer to the data buffer to be transmitted.
+ * @param  size: Size of the data buffer to be transmitted.
+ * @return I2C_Status: Returns the status of the transmission (I2C_OK, I2C_ERROR).
+ * @note   This function handles the slave transmit sequence, ensuring that
+ *         data is loaded to the Data Register and the interface stretches SCL low
+ *         if no data is available in DR to transmit. It clears the necessary flags
+ *         and ensures smooth data transmission with clock stretching.
+ */
+
+/**
+ * @brief IRQ Handlers for event and error interrupts
+ */
+void I2C_EV_IRQHandler(I2C_Config *config);
+void I2C_ER_IRQHandler(I2C_Config *config);
 /**
  * @brief Enables or disables specified callback events (interrupts) for the I2C peripheral in slave mode.
  *
