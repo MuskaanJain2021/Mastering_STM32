@@ -318,7 +318,30 @@ I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
  *  - The ADDR flag can only be cleared by reading SR1 followed by SR2.
  */
 void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
-{
+{    
+    I2C_TypeDef *I2Cx = config->I2Cx;
+
+    //check if the device is in the master mode 
+    if (I2Cx->SR2 & (1 << I2C_SR2_MSL))
+    {
+        //Device now in master mode
+
+
+        //Check if the given device is recieving data
+        if (config->TxRxState == I2C_BUSY_IN_RX)
+        { 
+            //check if only 1 byte is to be recieved
+            if (config->RxSize == 1)
+            {
+                //Disable the acknowledgement
+                I2C_AcknowledgeConfig(I2Cx,DISABLE);
+            }
+
+        }
+    }
+    
+    
+    // Clear ADDR flag by reading SR1 and SR2
     (void)I2Cx->SR1; // Read SR1 to clear the ADDR flag
     (void)I2Cx->SR2; // Read SR2 to complete the clearing process
 }
