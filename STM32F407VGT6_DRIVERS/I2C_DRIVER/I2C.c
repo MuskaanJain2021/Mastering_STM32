@@ -301,7 +301,7 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
 
     // Wait until BTF flag is set
     uint32_t BTF_timeout = timeout;
-    while (!(READ_BIT(O2C->SR1, I2C_SR1_BTF)))
+    while (!(READ_BIT(I2C->SR1, I2C_SR1_BTF)))
     {
         if (--BTF_timeout == 0)
         {
