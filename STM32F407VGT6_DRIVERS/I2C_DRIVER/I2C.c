@@ -8,7 +8,7 @@
 #include "I2C.h"
 #include "I2C_Def.h"
 #include "GPIO.h"
-
+#define TIMEOUT_MAX 1000
 extern I2C_Config config;
 
 /**
@@ -249,7 +249,7 @@ I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t directi
  *         - I2C_NACK_RECEIVED: NACK received from slave.
  *         - I2C_ERROR_TIMEOUT: Timeout occurred.
  *         - I2C_ERROR_BUS: Bus error detected.
- *         
+ *
  * @note   This function transmits data from the master to the specified
  *         slave by writing data byte-by-byte to the I2C data register (DR).
  */
@@ -274,18 +274,27 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
         uint32_t TXE_timeout = timeout; // Reset timeout for each byte
         WRITE_REG(I2Cx->DR, data[i]);   // Write data to DR
 
-        while (!(READ_BIT(I2Cx->SR1 & I2C_SR1_TXE)))
+        while (!(READ_BIT(I2Cx->SR1, I2C_SR1_TXE)))
         {
             if (--TXE_timeout == 0)
             {
                 I2C_Stop(I2Cx);
-                return I2C_TIMEOUT
+                return I2C_ERROR_TIMEOUT;
             }
             // Error Check
             if (READ_BIT(I2Cx->SR1, I2C_SR1_AF))
             {
+                // Clear AF flag
+                CLEAR_BIT(I2Cx->SR1, I2C_SR1_AF);
                 I2C_Stop(I2Cx);
                 return I2C_NACK_RECEIVED;
+            }
+            if (READ_BIT(I2Cx->SR1, I2C_SR1_BERR))
+            {
+                // Clear BERR flag
+                CLEAR_BIT(I2Cx->SR1, I2C_SR1_BERR);
+                I2C_Stop(I2Cx);
+                return I2C_ERROR_BUS;
             }
         }
     }
@@ -294,10 +303,10 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
     uint32_t BTF_timeout = timeout;
     while (!(READ_BIT(O2C->SR1, I2C_SR1_BTF)))
     {
-        if (BTF_timeout == 0)
+        if (--BTF_timeout == 0)
         {
             I2C_Stop(I2Cx);
-            return I2C_TIMEOUT
+            return I2C_ERROR_TIMEOUT;
         }
     }
     // Generate Stop Condition
@@ -365,6 +374,157 @@ I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, u
     WRITE_REG(I2Cx->CR1, I2Cx->CR1);
     return I2C_OK;
 }
+I2C_Status I2C_Master_Send_Byte(I2C_Config *config, uint8_t data)
+{
+    I2C_TypeDef *I2Cx = config->I2Cx;
+    uint32_t Byte_timeout = TIMEOUT_MAX;
+
+    // Write data to DR
+    WRITE_REG(I2Cx->DR, data);
+
+    // Wait until TXE (Transmit Data Register Empty) flag is set
+    while (!(READ_BIT(I2Cx->SR1, I2C_SR1_TXE)))
+    {
+        if (--Byte_timeout == 0)
+        {
+            return I2C_ERROR_TIMEOUT;
+        }
+        // Check for NACK
+        if (READ_BIT(I2Cx->SR1, I2C_SR1_AF))
+        {
+            // Clear AF flag
+            CLEAR_BIT(I2Cx->SR1, I2C_SR1_AF);
+            return I2C_NACK_RECEIVED;
+        }
+    }
+
+    return I2C_OK;
+}
+
+
+/**
+ * @brief  Reads a single byte from a specific register of an I2C device.
+ *
+ * This function performs a complete I2C read sequence to read a single byte
+ * from a register of an I2C slave device. It first generates a START condition,
+ * sends the device address with the write bit to specify the register address,
+ * generates a repeated START condition, sends the device address with the read bit,
+ * reads the data byte from the slave, and generates a STOP condition.
+ *
+ * @param  config: Pointer to the `I2C_Config` structure containing the configuration
+ *                 information for the I2C peripheral.
+ * @param  device_address: 7-bit I2C address of the target slave device.
+ * @param  reg_address: Register address within the slave device from which the data will be read.
+ * @param  data: Pointer to a variable where the read data byte will be stored.
+ *
+ * @retval I2C_Status: Status of the read operation.
+ *         - `I2C_OK`: Read operation completed successfully.
+ *         - `I2C_ERROR_TIMEOUT`: Timeout occurred during communication.
+ *         - `I2C_NACK_RECEIVED`: NACK received from the slave device.
+ *         - `I2C_ERROR_BUS`: Bus error detected.
+ *
+ * @note
+ * - Ensure that the I2C peripheral has been properly initialized before calling this function.
+ * - The `device_address` should be the 7-bit address of the slave device (excluding the R/W bit).
+ * - This function handles the generation of START, repeated START, and STOP conditions internally.
+ * - The ACK bit is managed within the function to properly receive the last byte.
+ */
+I2C_Status I2C_Master_Read_Register(I2C_Config *config, uint8_t device_address, uint8_t reg_address, uint8_t *data)
+{
+    I2C_Status status;
+
+    //Write the register address
+    status = I2C_Master_Start(config);
+    if (status != I2C_OK)
+        return status;
+
+    status = I2C_Master_Address(config, device_address, I2C_WRITE);
+    if (status != I2C_OK)
+        return status;
+
+    status = I2C_Master_Send_Byte(config, reg_address);
+    if (status != I2C_OK)
+        return status;
+
+    I2C_Master_Stop(config);
+
+    // Read the data from the register
+    status = I2C_Master_Start(config);
+    if (status != I2C_OK)
+        return status;
+
+    status = I2C_Master_Address(config, device_address, I2C_READ);
+    if (status != I2C_OK)
+        return status;
+
+    // Disable ACK before receiving the last byte
+    CLEAR_BIT(config->I2Cx->CR1, I2C_CR1_ACK);
+
+    status = I2C_Master_Receive_Byte(config, data);
+    if (status != I2C_OK)
+        return status;
+
+    I2C_Master_Stop(config);
+
+    // Re-enable ACK
+    SET_BIT(config->I2Cx->CR1, I2C_CR1_ACK);
+
+    return I2C_OK;
+}
+
+/**
+ * @brief  Writes a single byte to a specific register of an I2C device.
+ *
+ * This function performs a complete I2C write sequence to write a single byte
+ * to a register of an I2C slave device. It generates a START condition,
+ * sends the device address with the write bit, sends the register address,
+ * writes the data byte, and generates a STOP condition.
+ *
+ * @param  config: Pointer to the `I2C_Config` structure containing the configuration
+ *                 information for the I2C peripheral.
+ * @param  device_address: 7-bit I2C address of the target slave device.
+ * @param  reg_address: Register address within the slave device where the data will be written.
+ * @param  data: The data byte to be written to the specified register.
+ *
+ * @retval I2C_Status: Status of the write operation.
+ *         - `I2C_OK`: Write operation completed successfully.
+ *         - `I2C_ERROR_TIMEOUT`: Timeout occurred during communication.
+ *         - `I2C_NACK_RECEIVED`: NACK received from the slave device.
+ *         - `I2C_ERROR_BUS`: Bus error detected.
+ *
+ * @note
+ * - Ensure that the I2C peripheral has been properly initialized before calling this function.
+ * - The `device_address` should be the 7-bit address of the slave device (excluding the R/W bit).
+ * - This function handles the generation of START and STOP conditions internally.
+ *
+ */
+I2C_Status I2C_Master_Write_Register(I2C_Config *config, uint8_t device_address, uint8_t reg_address, uint8_t data)
+{
+
+    I2C_Status status;
+
+    status = I2C_Master_Start(config);
+    if (status != I2C_OK)
+        return status;
+
+    status = I2C_Master_Address(config, device_address, I2C_WRITE);
+    if (status != I2C_OK)
+        return status;
+
+    status = I2C_Master_Send_Byte(config, reg_address);
+    if (status != I2C_OK)
+        return status;
+
+    status = I2C_Master_Send_Byte(config, data);
+    if (status != I2C_OK)
+        return status;
+
+    I2C_Master_Stop(config);
+
+    return I2C_OK;
+}
+
+
 /**
  * @brief  Checks the I2C peripheral for any error conditions.
  * @param  I2Cx: Pointer to I2C peripheral.
