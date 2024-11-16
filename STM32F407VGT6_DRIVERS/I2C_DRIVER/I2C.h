@@ -185,11 +185,63 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
  */
 I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, uint32_t timeout);
 
+
+
+/*Sends a byte in form of address or byte data on sda line*/
+/**
+ * @brief Sends a single byte as a master.
+ *
+ * This function sends a single byte of data in master mode.
+ *
+ * @param config Pointer to the `I2C_Config` structure that contains the configuration information.
+ * @param data The data byte to be transmitted.
+ * @return I2C_Status Status of the operation.
+ *         - `I2C_OK`: Byte sent successfully.
+ *         - `I2C_NACK_RECEIVED`: NACK received from slave.
+ *         - `I2C_ERROR_TIMEOUT`: Timeout occurred.
+ */
+I2C_Status I2C_Master_Send_Byte(I2C_Config *config, uint8_t data);
+
+/**
+ * @brief Reads a single byte from a specific register of an I2C device.
+ *
+ * This function reads a byte from the specified register address of the slave device.
+ *
+ * @param config Pointer to the `I2C_Config` structure that contains the configuration information.
+ * @param device_address 7-bit I2C address of the target slave device.
+ * @param reg_address Register address within the slave device to read from.
+ * @param data Pointer to a variable where the read data byte will be stored.
+ * @return I2C_Status Status of the read operation.
+ *         - `I2C_OK`: Read operation completed successfully.
+ *         - `I2C_ERROR_TIMEOUT`: Timeout occurred during communication.
+ *         - `I2C_NACK_RECEIVED`: NACK received from the slave device.
+ *         - `I2C_ERROR_BUS`: Bus error detected.
+ */
+I2C_Status I2C_Master_Read_Register(I2C_Config *config, uint8_t device_address, uint8_t reg_address, uint8_t *data);
+
+/**
+ * @brief Writes a single byte to a specific register of an I2C device.
+ *
+ * This function writes a byte to the specified register address of the slave device.
+ *
+ * @param config Pointer to the `I2C_Config` structure that contains the configuration information.
+ * @param device_address 7-bit I2C address of the target slave device.
+ * @param reg_address Register address within the slave device to write to.
+ * @param data The data byte to be written to the specified register.
+ * @return I2C_Status Status of the write operation.
+ *         - `I2C_OK`: Write operation completed successfully.
+ *         - `I2C_ERROR_TIMEOUT`: Timeout occurred during communication.
+ *         - `I2C_NACK_RECEIVED`: NACK received from the slave device.
+ *         - `I2C_ERROR_BUS`: Bus error detected.
+ */
+I2C_Status I2C_Master_Write_Register(I2C_Config *config, uint8_t device_address, uint8_t reg_address, uint8_t data);
+
 /**
  * @brief Clears ADDR flag after address is matched
  *
  * @param I2Cx: I2C peripheral (I2C1, I2C2, I2C3)
  */
+
 void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx);
 
 /**
