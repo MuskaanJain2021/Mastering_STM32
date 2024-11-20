@@ -5,11 +5,15 @@
  *Author: muskaan jain
  */
 
+
+#include <stm32f4xx.h>
+#include "stm32f407xx.h"
 #include "I2C.h"
 #include "I2C_Def.h"
 #include "GPIO.h"
+#include "DMA.h"
 #define TIMEOUT_MAX 1000
-extern I2C_Config config;
+//extern I2C_Config config;
 
 /**
  * @brief  Enables the clock for the specified I2C peripheral.
@@ -55,6 +59,115 @@ void I2C_Clock_Disable(I2C_Config *config)
         RCC->APB1ENR &= ~RCC_APB1ENR_I2C3EN;
     }
 }
+/**
+ * @brief  Disables DMA requests for I2C data transfer.
+ * @param  I2Cx: Pointer to the I2C peripheral (I2C1, I2C2, I2C3).
+ * @note   This function clears the DMAEN bit in the CR2 register to stop
+ *         the I2C peripheral from sending DMA requests for data transfers.
+ */
+void I2C_DisableDMA(I2C_TypeDef *I2Cx)
+{
+    /* Clear DMAEN bit in CR2 register to disable DMA requests */
+    CLEAR_BIT(I2Cx->CR2, I2C_CR2_DMAEN);
+}
+
+/**
+ * @brief  Enables DMA requests for I2C data transfer.
+ * @param  I2Cx: Pointer to the I2C peripheral (I2C1, I2C2, I2C3).
+ * @note   This function sets the DMAEN bit in the CR2 register to allow
+ *         the I2C peripheral to send requests to the DMA controller for data transfers.
+ */
+void I2C_EnableDMA(I2C_TypeDef *I2Cx)
+{
+
+    /* Set DMAEN bit in CR2 register to enable DMA requests */
+    SET_BIT(I2Cx->CR2, I2C_CR2_DMAEN);
+}
+
+
+
+/**
+ * @brief Configure the acknowledgment state for the I2C peripheral.
+ *
+ * This function enables or disables the acknowledgment (ACK) feature in the
+ * I2C communication. When enabled, the I2C peripheral will send an ACK bit
+ * after receiving a byte of data. When disabled, it will send a NACK bit instead.
+ *
+ * @param I2Cx Pointer to the I2C peripheral base address.
+ *              This should be one of the I2C instances (I2C1, I2C2, or I2C3).
+ *
+ * @param NewState The desired acknowledgment state.
+ *                 This can be:
+ *                 - ENABLE: Enable acknowledgment.
+ *                 - DISABLE: Disable acknowledgment.
+ *
+ * @note
+ *  - This function should be called before starting a data transfer to
+ *    ensure the acknowledgment state is set correctly.
+ *  - Acknowledgment is crucial in I2C communication to confirm data reception
+ *    between the master and slave devices.
+ */
+void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState)
+{
+    if (NewState == ENABLE)
+    {
+        SET_BIT(I2Cx->CR1, I2C_CR1_ACK); // Set the ACK bit in CR1 register to enable acknowledgment.
+    }
+    else
+    {
+        CLEAR_BIT(I2Cx->CR1, I2C_CR1_ACK); // Clear the ACK bit in CR1 register to disable acknowledgment.
+    }
+}
+/**
+ * @brief Clear the ADDR flag in the I2C status registers.
+ *
+ * This function is used to clear the Address Sent (ADDR) flag in the
+ * I2C status register after the address has been acknowledged.
+ * It reads the status register to clear the ADDR flag. This is
+ * necessary to avoid any further interruptions in communication.
+ *
+ * @param I2Cx Pointer to the I2C peripheral base address.
+ *              This should be one of the I2C instances (I2C1, I2C2, or I2C3).
+ *
+ * @note
+ *  - The ADDR flag is set when an address is sent by the master or a slave address is matched
+ *    in slave mode. This function must be called after the address is transmitted to clear the flag.
+ *  - The ADDR flag can only be cleared by reading SR1 followed by SR2.
+ */
+/**
+ * @brief Clears the ADDR flag in the I2C peripheral's status registers.
+ *
+ * This function ensures the ADDR flag is properly cleared by reading SR1 and SR2.
+ * Additionally, it manages acknowledgment based on the transfer size and mode.
+ *
+ * @param I2Cx Pointer to the I2C peripheral base address (I2C1, I2C2, or I2C3).
+ * @param config Pointer to the I2C_Config structure that holds configuration details,
+ *               including the transfer state and RX size.
+ */
+void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx, I2C_Config *config)
+{
+    // Check if the device is in master mode
+    if (READ_BIT(I2Cx->SR2, I2C_SR2_MSL)) // MSL: Master/Slave mode
+    {
+        // Device is in master mode
+
+        // Check if the current operation is a read (receiving data)
+        if (config->TxRxState == I2C_BUSY_IN_RX)
+        {
+            // Check if only one byte is to be received
+            if (config->Rxsize == 1)
+            {
+                // Disable acknowledgment for the last byte
+                I2C_AcknowledgeConfig(I2Cx, DISABLE);
+            }
+        }
+    }
+
+    // Clear the ADDR flag by reading SR1 followed by SR2
+    (void)I2Cx->SR1; // Read SR1 to clear the ADDR flag
+    (void)I2Cx->SR2; // Read SR2 to complete the clearing process
+}
+
 
 /**
  * @brief  Initializes the I2C peripheral based on the provided configuration.
@@ -80,18 +193,18 @@ void I2C_Init(I2C_Config *config)
     /* Configure GPIO for SDA and SCL pins */
     if (config->I2Cx == I2C1)
     {
-        GPIO_Pin_Init(GPIOB, I2C1_Pins.SCL_PB6.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C1_Pins.SCL_PB6.altFunction);
-        GPIO_Pin_Init(GPIOB, I2C1_Pins.SDA_PB7.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C1_Pins.SDA_PB7.altFunction);
+        GPIO_Pin_Init(GPIOB, I2C1_Pins[0].SCL.pinNumber, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C1_Pins[0].SCL.altFunction);
+        GPIO_Pin_Init(GPIOB, I2C1_Pins[0].SDA.pinNumber, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C1_Pins[0].SDA.altFunction);
     }
     else if (config->I2Cx == I2C2)
     {
-        GPIO_Pin_Init(GPIOB, I2C2_Pins.SCL_PB10.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C2_Pins.SCL_PB10.altFunction);
-        GPIO_Pin_Init(GPIOB, I2C2_Pins.SDA_PB11.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C2_Pins.SDA_PB11.altFunction);
+        GPIO_Pin_Init(GPIOB, I2C2_Pins.SCL.pinNumber,GPIO_MODE_ALTERNATE_FUNCTION, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_NO, I2C2_Pins.SCL.altFunction);
+        GPIO_Pin_Init(GPIOB, I2C2_Pins.SDA.pinNumber, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_NO, I2C2_Pins.SDA.altFunction);
     }
     else if (config->I2Cx == I2C3)
     {
-        GPIO_Pin_Init(GPIOA, I2C3_Pins.SCL_PA8.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C3_Pins.SCL_PA8.altFunction);
-        GPIO_Pin_Init(GPIOC, I2C3_Pins.SDA_PC9.pinNumber, GPIO_MODE_AF, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_UP, I2C3_Pins.SDA_PC9.altFunction);
+        GPIO_Pin_Init(GPIOA,I2C3_Pins.SCL.pinNumber, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_NO, I2C3_Pins.SCL.altFunction);
+        GPIO_Pin_Init(GPIOC,I2C3_Pins.SDA.pinNumber, GPIO_MODE_ALTERNATE_FUNCTION, GPIO_OUTPUT_TYPE_OPEN_DRAIN, GPIO_SPEED_HIGH, GPIO_PULL_NO, I2C3_Pins.SDA.altFunction);
     }
 
     /* Disable I2C Peripheral before making configurations */
@@ -154,16 +267,16 @@ void I2C_Init(I2C_Config *config)
     }
 
     /* Set I2C Mode (Master or Slave) */
-    if (config->mode == I2C_MODE_MASTER)
-    {
-        /* Master mode configuration */
-        config->I2Cx->CCR = config->speed; /* Set clock speed for master mode */
-    }
-    else if (config->mode == I2C_MODE_SLAVE)
-    {
+//    if (config->mode == I2C_MODE_MASTER)
+//    {
+//        /* Master mode configuration */
+//        config->I2Cx->CCR = config->speed; /* Set clock speed for master mode */
+//    }
+//    else if (config->mode == I2C_MODE_SLAVE)
+  //  {
         /* Slave mode configuration */
-        config->I2Cx->OAR1 = (config->ownAddress << 1); /* Set own address for slave mode */
-    }
+   //     config->I2Cx->OAR1 = (config->ownAddress << 1); /* Set own address for slave mode */
+   // }
     /*Disable clock stretching*/
     config->I2Cx->CR1 |= I2C_CR1_NOSTRETCH;
     /* Enable I2C peripheral after configuration */
@@ -177,19 +290,20 @@ void I2C_Init(I2C_Config *config)
  * @note   This function sets the START bit in the CR1 register to initiate
  *         communication and waits until the start condition is generated.
  */
-int I2C_Start(I2C_TypeDef *I2Cx)
+uint8_t I2C_Start(I2C_Config *config)
 {
     int timeout = 1000;               // Correct variable name
-    I2Cx->CR1 |= I2C_CR1_START;       /* Set the START bit to begin communication */
-    while (!(I2Cx->SR1 & I2C_SR1_SB)) // Wait for the start bit to be set
+    config->I2Cx->CR1 |= I2C_CR1_START;       /* Set the START bit to begin communication */
+    config->I2Cx->CR1 |= I2C_CR1_START;
+    while (!(config->I2Cx->SR1 & I2C_SR1_SB)) // Wait for the start bit to be set
     {
         if (timeout == 0)
         {
-            return I2C_ERROR_TIMEOUT; // Return error code on timeout
+            return -1; // Return error code on timeout
         }
         timeout--; // Decrement timeout counter
     }
-    return 0; // Return success code
+    return I2C_OK; // Return success code
 }
 
 /**
@@ -198,10 +312,11 @@ int I2C_Start(I2C_TypeDef *I2Cx)
  * @note   This function sets the STOP bit in the CR1 register to terminate
  *         communication after a transmission or reception.
  */
-void I2C_Stop(I2C_TypeDef *I2Cx)
+void I2C_Stop(I2C_Config *config)
 {
-    I2Cx->CR1 |= I2C_CR1_STOP; /* Set the STOP bit to end communication */
+    config->I2Cx->CR1 |= I2C_CR1_STOP; /* Set the STOP bit to end communication */
 }
+
 
 /**
  * @brief  Sends the I2C address with the read/write direction.
@@ -212,9 +327,9 @@ void I2C_Stop(I2C_TypeDef *I2Cx)
  * @note   This function sends the 7-bit address along with the direction (R/W bit)
  *         and waits until the address is acknowledged by the slave.
  */
-I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t direction)
+I2C_Status I2C_WriteAddress(I2C_Config *config, uint16_t address, uint8_t direction)
 {
-    I2C_TypeDef *I2Cx = config->I2cx;
+
     // Set the TxRxState based on the direction
     if (direction == I2C_READ)
     {
@@ -226,11 +341,11 @@ I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t directi
     }
 
     // Send a 7-bit address  with direction bit
-    WRITE_REG(I2CX->DR = (address << 1) | direction); /* Send the 7-bit address and the direction bit */
-    while (!READ_BIT(I2Cx->SR1 & I2C_SR1_ADDR))
+    WRITE_REG(config->I2Cx->DR ,((address << 1) | direction)); /* Send the 7-bit address and the direction bit */
+    while (!READ_BIT(config->I2Cx->SR1 , I2C_SR1_ADDR))
         ; // Wait until the address is sent/acknowledgemet of addr
 
-    I2C_ClearADDRFlag(I2Cx); // Clear the ADDR flag
+    I2C_ClearADDRFlag(config->I2Cx,config); // Clear the ADDR flag
 
     return I2C_OK;
 }
@@ -255,62 +370,192 @@ I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t directi
  */
 I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8_t *data, uint16_t size, uint32_t timeout)
 {
-    I2C_TypeDef *I2Cx = config->I2Cx;
     I2C_Status status;
-    status = I2C_Start(config->I2Cx);
+
+    // Start I2C communication
+    status = I2C_Start(config);
     if (status != I2C_OK)
     {
-        return status;
+        return status; // Return if start condition fails
     }
-    status = I2C_WriteAddress(config->I2Cx, address, I2C_Direction_Transmitter);
+
+    // Send the address with the transmitter direction
+    status = I2C_WriteAddress(config, address, I2C_Direction_Transmitter);
     if (status != I2C_OK)
     {
-        I2C_Stop(config->I2Cx);
+        I2C_Stop(config); // Generate stop condition on failure
         return status;
     }
 
+    // Transmit the data
     for (uint16_t i = 0; i < size; i++)
     {
         uint32_t TXE_timeout = timeout; // Reset timeout for each byte
-        WRITE_REG(I2Cx->DR, data[i]);   // Write data to DR
 
-        while (!(READ_BIT(I2Cx->SR1, I2C_SR1_TXE)))
+        WRITE_REG(config->I2Cx->DR, data[i]); // Write data to the data register
+
+        // Wait for TXE (Transmit buffer empty)
+        while (!(READ_BIT(config->I2Cx->SR1, I2C_SR1_TXE)))
         {
             if (--TXE_timeout == 0)
             {
-                I2C_Stop(I2Cx);
+                I2C_Stop(config); // Stop if timeout occurs
                 return I2C_ERROR_TIMEOUT;
             }
-            // Error Check
-            if (READ_BIT(I2Cx->SR1, I2C_SR1_AF))
+
+            // Check for errors
+            if (READ_BIT(config->I2Cx->SR1, I2C_SR1_AF))
             {
-                // Clear AF flag
-                CLEAR_BIT(I2Cx->SR1, I2C_SR1_AF);
-                I2C_Stop(I2Cx);
+                // Clear the Acknowledge failure flag
+                CLEAR_BIT(config->I2Cx->SR1, I2C_SR1_AF);
+                I2C_Stop(config);
                 return I2C_NACK_RECEIVED;
             }
-            if (READ_BIT(I2Cx->SR1, I2C_SR1_BERR))
+            if (READ_BIT(config->I2Cx->SR1, I2C_SR1_BERR))
             {
-                // Clear BERR flag
-                CLEAR_BIT(I2Cx->SR1, I2C_SR1_BERR);
-                I2C_Stop(I2Cx);
+                // Clear the Bus error flag
+                CLEAR_BIT(config->I2Cx->SR1, I2C_SR1_BERR);
+                I2C_Stop(config);
                 return I2C_ERROR_BUS;
             }
         }
     }
 
-    // Wait until BTF flag is set
+    // Wait for BTF (Byte transfer finished)
     uint32_t BTF_timeout = timeout;
-    while (!(READ_BIT(I2C->SR1, I2C_SR1_BTF)))
+    while (!(READ_BIT(config->I2Cx->SR1, I2C_SR1_BTF)))
     {
         if (--BTF_timeout == 0)
         {
-            I2C_Stop(I2Cx);
+            I2C_Stop(config);
             return I2C_ERROR_TIMEOUT;
         }
     }
-    // Generate Stop Condition
-    I2C_Stop(config->I2Cx);
+
+    // Generate stop condition
+    I2C_Stop(config);
+
+    return I2C_OK;
+}
+/**
+ * @brief  Receives a block of data in master mode from a specific I2C slave.
+ * @param  config: Pointer to the I2C_Config structure that contains
+ *                 the configuration information for the I2C peripheral.
+ * @param  address: 7-bit address of the I2C slave device.
+ * @param  data: Pointer to the buffer where the received data will be stored.
+ * @param  size: Number of bytes to receive.
+ * @param  timeout: Timeout value for the reception process.
+ * @return I2C_Status: Returns the status of the reception.
+ *         - I2C_OK: Reception successful.
+ *         - I2C_ERROR_TIMEOUT: Timeout occurred.
+ *         - I2C_NACK_RECEIVED: NACK received from the slave device.
+ *         - I2C_ERROR_BUS: Bus error detected.
+ *
+ * @note   This function performs a complete I2C read sequence in master mode.
+ *         - Generates a START condition.
+ *         - Sends the slave address with the read bit.
+ *         - Reads the specified number of bytes from the slave.
+ *         - Generates a STOP condition after reception.
+ */
+I2C_Status I2C_Master_Receive(I2C_Config *config, uint16_t address, uint8_t *data, uint16_t size, uint32_t timeout)
+{
+    I2C_TypeDef *I2Cx = config->I2Cx;
+    I2C_Status status;
+
+    // Start I2C communication
+    status = I2C_Start(config);
+    if (status != I2C_OK)
+    {
+        return status; // Return if start condition fails
+    }
+
+    // Send the slave address with the read direction
+    status = I2C_WriteAddress(config, address, I2C_READ);
+    if (status != I2C_OK)
+    {
+        I2C_Stop(config); // Generate stop condition on failure
+        return status;
+    }
+
+    // Clear ADDR flag
+    I2C_ClearADDRFlag(I2Cx, config);
+
+    if (size == 1)
+    {
+        // Single-byte reception
+    	I2C_AcknowledgeConfig(I2Cx,DISABLE);
+       // CLEAR_BIT(I2Cx->CR1, I2C_CR1_ACK); // Disable ACK
+
+        // Wait for RXNE (Receive Buffer Not Empty)
+        uint32_t RXNE_timeout = timeout;
+        while (!(READ_BIT(I2Cx->SR1, I2C_SR1_RXNE)))
+        {
+            if (--RXNE_timeout == 0)
+            {
+                I2C_Stop(config); // Stop on timeout
+                return I2C_ERROR_TIMEOUT;
+            }
+        }
+
+        *data = (uint8_t)(I2Cx->DR & 0xFF); // Read data
+
+        I2C_Stop(config); // Generate stop condition
+        I2C_AcknowledgeConfig(I2Cx,ENABLE);
+        //SET_BIT(I2Cx->CR1, I2C_CR1_ACK); // Re-enable ACK
+    }
+    else if (size == 2)
+    {
+        // Two-byte reception
+        CLEAR_BIT(I2Cx->CR1, I2C_CR1_ACK); // Disable ACK
+        SET_BIT(I2Cx->CR1, I2C_CR1_POS);  // Enable POS bit
+
+        // Wait for BTF (Byte Transfer Finished)
+        uint32_t BTF_timeout = timeout;
+        while (!(READ_BIT(I2Cx->SR1, I2C_SR1_BTF)))
+        {
+            if (--BTF_timeout == 0)
+            {
+                I2C_Stop(config); // Stop on timeout
+                return I2C_ERROR_TIMEOUT;
+            }
+        }
+
+        I2C_Stop(config); // Generate stop condition
+
+        // Read the two bytes
+        data[0] = (uint8_t)(I2Cx->DR & 0xFF);
+        data[1] = (uint8_t)(I2Cx->DR & 0xFF);
+
+        I2C_AcknowledgeConfig(I2Cx,ENABLE); // Re-enable ACK
+        CLEAR_BIT(I2Cx->CR1, I2C_CR1_POS); // Clear POS bit
+    }
+    else
+    {
+        // Multi-byte reception
+        for (uint16_t i = 0; i < size; i++)
+        {
+            uint32_t RXNE_timeout = timeout;
+
+            while (!(READ_BIT(I2Cx->SR1, I2C_SR1_RXNE))) // Wait for RXNE
+            {
+                if (--RXNE_timeout == 0)
+                {
+                    I2C_Stop(config); // Stop on timeout
+                    return I2C_ERROR_TIMEOUT;
+                }
+            }
+
+            data[i] = (uint8_t)(I2Cx->DR & 0xFF); // Read data
+
+            if (i == size - 2)
+            {
+                I2C_AcknowledgeConfig(I2Cx,DISABLE); // Disable ACK for second-to-last byte
+            }
+        }
+
+        I2C_Stop(config); // Generate stop condition
+        I2C_AcknowledgeConfig(I2Cx,ENABLE); // Re-enable ACK
+    }
 
     return I2C_OK;
 }
@@ -374,6 +619,28 @@ I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, u
     WRITE_REG(I2Cx->CR1, I2Cx->CR1);
     return I2C_OK;
 }
+
+
+I2C_Status I2C_Master_Read_Byte(I2C_Config *config, uint8_t *data)
+{
+    I2C_TypeDef *I2Cx = config->I2Cx;
+    uint32_t timeout = TIMEOUT_MAX;
+
+    // Wait for the RXNE (Receive Buffer Not Empty) flag
+    while (!(READ_BIT(I2Cx->SR1, I2C_SR1_RXNE)))
+    {
+        if (--timeout == 0)
+        {
+            return I2C_ERROR_TIMEOUT; // Return timeout error
+        }
+    }
+
+    // Read the data from the data register
+    *data = (uint8_t)(I2Cx->DR & 0xFF);
+
+    return I2C_OK; // Return success
+}
+
 I2C_Status I2C_Master_Send_Byte(I2C_Config *config, uint8_t data)
 {
     I2C_TypeDef *I2Cx = config->I2Cx;
@@ -434,11 +701,11 @@ I2C_Status I2C_Master_Read_Register(I2C_Config *config, uint8_t device_address, 
     I2C_Status status;
 
     //Write the register address
-    status = I2C_Master_Start(config);
+    status = I2C_Start(config);
     if (status != I2C_OK)
         return status;
 
-    status = I2C_Master_Address(config, device_address, I2C_WRITE);
+    status = I2C_WriteAddress(config, device_address, I2C_WRITE);
     if (status != I2C_OK)
         return status;
 
@@ -446,29 +713,29 @@ I2C_Status I2C_Master_Read_Register(I2C_Config *config, uint8_t device_address, 
     if (status != I2C_OK)
         return status;
 
-    I2C_Master_Stop(config);
+    I2C_Stop(config);
 
     // Read the data from the register
-    status = I2C_Master_Start(config);
+    status = I2C_Start(config);
     if (status != I2C_OK)
         return status;
 
-    status = I2C_Master_Address(config, device_address, I2C_READ);
+    status = I2C_WriteAddress(config, device_address, I2C_READ);
     if (status != I2C_OK)
         return status;
-
+    I2C_AcknowledgeConfig(config->I2Cx,DISABLE);
     // Disable ACK before receiving the last byte
-    CLEAR_BIT(config->I2Cx->CR1, I2C_CR1_ACK);
+   // CLEAR_BIT(config->I2Cx->CR1, I2C_CR1_ACK);
 
-    status = I2C_Master_Receive_Byte(config, data);
+    status = I2C_Master_Read_Byte(config, data);
     if (status != I2C_OK)
         return status;
 
-    I2C_Master_Stop(config);
+    I2C_Stop(config);
 
     // Re-enable ACK
-    SET_BIT(config->I2Cx->CR1, I2C_CR1_ACK);
-
+    //SET_BIT(config->I2Cx->CR1, I2C_CR1_ACK);
+    I2C_AcknowledgeConfig(config->I2Cx,ENABLE);
     return I2C_OK;
 }
 
@@ -503,11 +770,11 @@ I2C_Status I2C_Master_Write_Register(I2C_Config *config, uint8_t device_address,
 
     I2C_Status status;
 
-    status = I2C_Master_Start(config);
+    status = I2C_Start(config);
     if (status != I2C_OK)
         return status;
 
-    status = I2C_Master_Address(config, device_address, I2C_WRITE);
+    status = I2C_WriteAddress(config, device_address, I2C_WRITE);
     if (status != I2C_OK)
         return status;
 
@@ -519,7 +786,7 @@ I2C_Status I2C_Master_Write_Register(I2C_Config *config, uint8_t device_address,
     if (status != I2C_OK)
         return status;
 
-    I2C_Master_Stop(config);
+    I2C_Stop(config);
 
     return I2C_OK;
 }
@@ -536,7 +803,7 @@ I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
     {
         // Clear the AF flag by writing 0
         CLEAR_BIT(I2Cx->SR1, I2C_SR1_AF);
-        return I2C_ERROR_ACK_FAILURE; // Acknowledge failure
+        return I2C_NACK_RECEIVED; // Acknowledge failure
     }
     if (READ_BIT(I2Cx->SR1, I2C_SR1_OVR))
     {
@@ -546,7 +813,7 @@ I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
     if (READ_BIT(I2Cx->SR1, I2C_SR1_ARLO))
     {
         CLEAR_BIT(I2Cx->SR1, I2C_SR1_ARLO);
-        return I2C_ERROR_ARBITRATION_LOST; // arbitration loss error
+        return I2C_ARBITRATION_LOST; // arbitration loss error
     }
     if (READ_BIT(I2Cx->SR1, I2C_SR1_BERR))
     {
@@ -556,46 +823,7 @@ I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
     return I2C_OK; // No error
 }
 
-/**
- * @brief Clear the ADDR flag in the I2C status registers.
- *
- * This function is used to clear the Address Sent (ADDR) flag in the
- * I2C status register after the address has been acknowledged.
- * It reads the status register to clear the ADDR flag. This is
- * necessary to avoid any further interruptions in communication.
- *
- * @param I2Cx Pointer to the I2C peripheral base address.
- *              This should be one of the I2C instances (I2C1, I2C2, or I2C3).
- *
- * @note
- *  - The ADDR flag is set when an address is sent by the master or a slave address is matched
- *    in slave mode. This function must be called after the address is transmitted to clear the flag.
- *  - The ADDR flag can only be cleared by reading SR1 followed by SR2.
- */
-void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx)
-{
 
-    // check if the device is in the master mode
-    if (READ_BIT(I2Cx->SR2, I2C_SR2_MSL))
-    {
-        // Device now in master mode
-
-        // Check if the given device is recieving data
-        if (config->TxRxState == I2C_BUSY_IN_RX)
-        {
-            // check if only 1 byte is to be recieved
-            if (config->RxSize == 1)
-            {
-                // Disable the acknowledgement
-                I2C_AcknowledgeConfig(I2Cx, DISABLE);
-            }
-        }
-    }
-
-    // Clear ADDR flag by reading SR1 and SR2
-    (void)I2Cx->SR1; // Read SR1 to clear the ADDR flag
-    (void)I2Cx->SR2; // Read SR2 to complete the clearing process
-}
 /**
  * @brief  Checks if the bus is busy
  *
@@ -624,74 +852,18 @@ I2C_Status I2C_CheckBusBusy(I2C_TypeDef *I2Cx)
  *         - I2C_SR1_AF: Acknowledge failure
  * @return uint8_t: 1 if the flag is set, 0 if the flag is reset.
  */
-uint8_t I2C_GetFlagStatus(I2C_Config I2Cx, uint32_t flag)
-{
-    if (READ_BIT(I2Cx->SR1, flag) != 0)
-    {
-        return 1; /*Set the given flag*/
-    }
-    else
-    {
-        return 0; /*Reset the given flag*/
-    }
-}
+//uint8_t I2C_GetFlagStatus(I2C_Config I2Cx, uint32_t flag)
+//{
+//    if (READ_BIT(I2Cx->SR1, flag) != 0)
+//    {
+//        return 1; /*Set the given flag*/
+//    }
+//    else
+//    {
+//        return 0; /*Reset the given flag*/
+//    }
+//}
 
-/**
- * @brief  Disables DMA requests for I2C data transfer.
- * @param  I2Cx: Pointer to the I2C peripheral (I2C1, I2C2, I2C3).
- * @note   This function clears the DMAEN bit in the CR2 register to stop
- *         the I2C peripheral from sending DMA requests for data transfers.
- */
-void I2C_DisableDMA(I2C_TypeDef *I2Cx)
-{
-    /* Clear DMAEN bit in CR2 register to disable DMA requests */
-    CLEAR_BIT(I2Cx->CR2, I2C_CR2_DMAEN);
-}
-
-/**
- * @brief  Enables DMA requests for I2C data transfer.
- * @param  I2Cx: Pointer to the I2C peripheral (I2C1, I2C2, I2C3).
- * @note   This function sets the DMAEN bit in the CR2 register to allow
- *         the I2C peripheral to send requests to the DMA controller for data transfers.
- */
-void I2C_EnableDMA(I2C_TypeDef *I2Cx)
-{
-    /* Set DMAEN bit in CR2 register to enable DMA requests */
-    SET_BIT(I2Cx->CR2, I2C_CR2_DMAEN);
-}
-
-/**
- * @brief Configure the acknowledgment state for the I2C peripheral.
- *
- * This function enables or disables the acknowledgment (ACK) feature in the
- * I2C communication. When enabled, the I2C peripheral will send an ACK bit
- * after receiving a byte of data. When disabled, it will send a NACK bit instead.
- *
- * @param I2Cx Pointer to the I2C peripheral base address.
- *              This should be one of the I2C instances (I2C1, I2C2, or I2C3).
- *
- * @param NewState The desired acknowledgment state.
- *                 This can be:
- *                 - ENABLE: Enable acknowledgment.
- *                 - DISABLE: Disable acknowledgment.
- *
- * @note
- *  - This function should be called before starting a data transfer to
- *    ensure the acknowledgment state is set correctly.
- *  - Acknowledgment is crucial in I2C communication to confirm data reception
- *    between the master and slave devices.
- */
-void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState)
-{
-    if (NewState == ENABLE)
-    {
-        SET_BIT(I2Cx->CR1, I2C_CR1_ACK); // Set the ACK bit in CR1 register to enable acknowledgment.
-    }
-    else
-    {
-        CLEAR_BIT(I2Cx->CR1, I2C_CR1_ACK); // Clear the ACK bit in CR1 register to disable acknowledgment.
-    }
-}
 /**
  * @brief  Enables or disables callback events (interrupts) for the I2C peripheral in slave mode.
  * @param  pI2Cx: Pointer to the I2C peripheral (I2C1, I2C2, or I2C3).
@@ -700,7 +872,7 @@ void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState)
  * @note   This function uses the I2C_Config structure to selectively enable or disable
  *         Error, Event, and Buffer interrupts for I2C communication.
  */
-void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, I2C_Config *config, uint8_t EnorDi)
+void I2C_SlaveEnableDisableCallbackEvents(I2C_TypeDef *pI2Cx, I2C_Config *config, uint8_t EnorDi)
 {
     if (EnorDi == ENABLE)
     {
@@ -740,6 +912,10 @@ void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, I2C_Config *confi
  */
 void I2C_Reset(I2C_Config *config)
 {
+	 I2C_TypeDef *I2Cx = config->I2Cx;
+
+	 // Disable the peripheral
+	 CLEAR_BIT(I2Cx->CR1, I2C_CR1_PE);
     /* Set I2C speed mode to Fast Mode (FM_Mode) */
     config->speed_mode.SM_Mode = 0;
     config->speed_mode.FM_Mode = 1;
@@ -749,6 +925,8 @@ void I2C_Reset(I2C_Config *config)
     config->Interrupts.Error = 0;
     config->Interrupts.Event = 0;
     config->Interrupts.Buffer = 0;
+    config->DMA_Control.TX_DMA_Enable = 0;
+    config->DMA_Control.RX_DMA_Enable = 0;
 
     /* Set I2C mode to Master */
     config->mode = I2C_MODE_MASTER;
