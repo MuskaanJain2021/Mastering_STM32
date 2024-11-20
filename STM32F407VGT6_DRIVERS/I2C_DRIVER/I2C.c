@@ -118,22 +118,7 @@ void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState)
         CLEAR_BIT(I2Cx->CR1, I2C_CR1_ACK); // Clear the ACK bit in CR1 register to disable acknowledgment.
     }
 }
-/**
- * @brief Clear the ADDR flag in the I2C status registers.
- *
- * This function is used to clear the Address Sent (ADDR) flag in the
- * I2C status register after the address has been acknowledged.
- * It reads the status register to clear the ADDR flag. This is
- * necessary to avoid any further interruptions in communication.
- *
- * @param I2Cx Pointer to the I2C peripheral base address.
- *              This should be one of the I2C instances (I2C1, I2C2, or I2C3).
- *
- * @note
- *  - The ADDR flag is set when an address is sent by the master or a slave address is matched
- *    in slave mode. This function must be called after the address is transmitted to clear the flag.
- *  - The ADDR flag can only be cleared by reading SR1 followed by SR2.
- */
+
 /**
  * @brief Clears the ADDR flag in the I2C peripheral's status registers.
  *
