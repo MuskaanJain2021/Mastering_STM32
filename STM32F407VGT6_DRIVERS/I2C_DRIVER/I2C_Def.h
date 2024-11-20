@@ -11,6 +11,9 @@
 #include "main.h"
 #define I2C_READ    1
 #define I2C_WRITE   0
+
+#define I2C_Direction_Transmitter I2C_WRITE
+#define I2C_Direction_Receiver    I2C_READ
 /* Structure to hold I2C Pin configuration */
 typedef struct {
     uint8_t pinNumber;       // GPIO Pin number
