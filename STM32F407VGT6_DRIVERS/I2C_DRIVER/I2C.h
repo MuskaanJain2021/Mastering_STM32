@@ -5,15 +5,16 @@
  *  Author: muskaan jain
  */
 
+
 #ifndef I2C_H_
 #define I2C_H_
 
 #include "main.h"
-#include "GPIO.h"
+
 #include "I2C_Def.h"
 #include "DMA.h"
 #include <stm32f4xx.h>
-#include <stm32f407xx.h> 
+#include <stm32f407xx.h>
 /* Error codes */
 typedef enum
 {
@@ -97,7 +98,7 @@ typedef struct
     I2C_Callbacks callbacks;     // Callback functions for events
     uint8_t TxRxState;           //Transmission/Reception State
     uint16_t Rxsize;             //Size of recieved data
-    uint16_t Txsize;             //size of data to be transmitted 
+    uint16_t Txsize;             //size of data to be transmitted
 
 } I2C_Config;
 
@@ -126,16 +127,16 @@ void I2C_Clock_Disable(I2C_Config *config);
 /**
  * @brief Starts I2C communication
  *
- * @param I2Cx: I2C peripheral (I2C1, I2C2, I2C3)
+ * @param config: Configuration structure for I2C
  */
-int I2C_Start(I2C_TypeDef *I2Cx);
+uint8_t  I2C_Start(I2C_Config *config);
 
 /**
  * @brief Stops I2C communication
  *
- * @param I2Cx: I2C peripheral (I2C1, I2C2, I2C3)
+ * @param config: Configuration structure for I2C
  */
-void I2C_Stop(I2C_TypeDef *I2Cx);
+void I2C_Stop(I2C_Config *config);
 
 /**
  * @brief Sends address on I2C bus
@@ -145,7 +146,7 @@ void I2C_Stop(I2C_TypeDef *I2Cx);
  * @param direction: Direction of communication (Read/Write)
  * @return I2C_Status: Status of the operation
  */
-I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t direction);
+I2C_Status I2C_WriteAddress(I2C_Config *config, uint16_t address, uint8_t direction);
 
 /**
  * @brief Checks the status of the specified I2C flag.
@@ -184,8 +185,8 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
  * @return I2C_Status: Status of the operation
  */
 I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, uint32_t timeout);
-
-
+I2C_Status I2C_Master_Receive(I2C_Config *config, uint16_t address, uint8_t *data, uint16_t size, uint32_t timeout);
+I2C_Status I2C_Master_Read_Byte(I2C_Config *config, uint8_t *data);
 
 /*Sends a byte in form of address or byte data on sda line*/
 /**
@@ -242,7 +243,7 @@ I2C_Status I2C_Master_Write_Register(I2C_Config *config, uint8_t device_address,
  * @param I2Cx: I2C peripheral (I2C1, I2C2, I2C3)
  */
 
-void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx);
+void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx,I2C_Config *config);
 
 /**
  * @brief Configures Acknowledge control
@@ -252,15 +253,6 @@ void I2C_ClearADDRFlag(I2C_TypeDef *I2Cx);
  */
 void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState);
 
-/**
- * @brief Writes a 7-bit address on I2C bus
- *
- * @param I2Cx: I2C peripheral
- * @param address: 7-bit slave address
- * @param direction: Direction of communication (Read/Write)
- * @return I2C_Status: Status of the operation
- */
-I2C_Status I2C_WriteAddress(I2C_TypeDef *I2Cx, uint16_t address, uint8_t direction);
 
 /**
  * @brief Checks if the bus is busy
@@ -273,23 +265,23 @@ I2C_Status I2C_CheckBusBusy(I2C_TypeDef *I2Cx);
 /**
  * @brief Enables DMA for I2C
  *
- * @param config: I2C configuration
+ * @param I2Cx: I2C peripheral (I2C1, I2C2, I2C3)
  */
-void I2C_EnableDMA(I2C_Config *config);
+void I2C_EnableDMA(I2C_TypeDef *I2Cx);
 
 /**
  * @brief Disables DMA for I2C
  *
- * @param config: I2C configuration
+ * @param I2Cx: I2C peripheral (I2C1, I2C2, I2C3)
  */
-void I2C_DisableDMA(I2C_Config *config);
+void I2C_DisableDMA(I2C_TypeDef *I2Cx);
 
 /**
  * @brief Resets I2C peripheral
  *
  * @param I2Cx: I2C peripheral (I2C1, I2C2, I2C3)
  */
-void I2C_Reset(I2C_TypeDef *I2Cx);
+void I2C_Reset(I2C_Config *I2Cx);
 
 /**
  * @brief Checks for I2C error flags
@@ -323,6 +315,7 @@ void I2C_ER_IRQHandler(I2C_Config *config);
  * @param config: Configuration structure with enabled interrupts
  * @param EnorDi: Set to ENABLE to enable specified events or DISABLE to disable them
  */
-void I2C_SlaveEnableDisableCallbackEvents(I2C_RegDef_t *pI2Cx, I2C_Config *config, uint8_t EnorDi);
+void I2C_SlaveEnableDisableCallbackEvents(I2C_TypeDef *pI2Cx, I2C_Config *config, uint8_t EnorDi);
+
 
 #endif /* I2C_H_ */
