@@ -5,7 +5,6 @@
  *  Author: muskaan jain
  */
 
-
 #ifndef I2C_H_
 #define I2C_H_
 
@@ -28,6 +27,19 @@ typedef enum
     I2C_ERROR_BUS         // Hardware-related bus error
 } I2C_Status;
 
+/* Event flags */
+typedef enum {
+    I2C_EV_TX_CMPLT        = (1 << 0), // Transmission complete
+    I2C_EV_RX_CMPLT        = (1 << 1), // Reception complete
+    I2C_EV_STOP            = (1 << 2), // STOP condition detected
+    I2C_ERROR_BERR_EV      = (1 << 3), // Bus error
+    I2C_ERROR_ARLO_EV      = (1 << 4), // Arbitration lost
+    I2C_ERROR_AF_EV         = (1 << 5), // Acknowledge failure
+    I2C_ERROR_OVR_EV        = (1 << 6), // Overrun error
+    I2C_ERROR_TIMEOUT_EV     = (1 << 7), // Timeout error
+    I2C_EV_DATA_REQ        = (1 << 8), // Data request (slave mode)
+    I2C_EV_DATA_RCV        = (1 << 9)  // Data received (slave mode)
+} I2C_EventFlags;
 /* I2C Speeds */
 typedef enum
 {
@@ -85,6 +97,8 @@ typedef struct
     I2C_Callback onError;            // Callback for error handling
 } I2C_Callbacks;
 
+
+
 /* I2C Configuration structure */
 typedef struct
 {
@@ -99,7 +113,9 @@ typedef struct
     uint8_t TxRxState;           //Transmission/Reception State
     uint16_t Rxsize;             //Size of recieved data
     uint16_t Txsize;             //size of data to be transmitted
-
+    uint32_t  *TxBuffer;         //Appn: Tx buffer Addr
+	uint32_t   *RxBuffer;       //Appn: Rx Buffer Addr
+	uint8_t    Repeat_SR;       //To store repeated start value
 } I2C_Config;
 
 /* Function prototypes */
@@ -174,20 +190,8 @@ I2C_Status I2C_WriteAddress(I2C_Config *config, uint16_t address, uint8_t direct
  * @return I2C_Status: Status of the operation
  */
 I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8_t *data, uint16_t size, uint32_t timeout);
-
-/**
- * @brief Slave receive data
- *
- * @param config: I2C configuration
- * @param data: Pointer to buffer for received data
- * @param size: Size of the data
- * @param timeout: Timeout for the operation
- * @return I2C_Status: Status of the operation
- */
-I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, uint32_t timeout);
 I2C_Status I2C_Master_Receive(I2C_Config *config, uint16_t address, uint8_t *data, uint16_t size, uint32_t timeout);
 I2C_Status I2C_Master_Read_Byte(I2C_Config *config, uint8_t *data);
-
 /*Sends a byte in form of address or byte data on sda line*/
 /**
  * @brief Sends a single byte as a master.
@@ -202,6 +206,20 @@ I2C_Status I2C_Master_Read_Byte(I2C_Config *config, uint8_t *data);
  *         - `I2C_ERROR_TIMEOUT`: Timeout occurred.
  */
 I2C_Status I2C_Master_Send_Byte(I2C_Config *config, uint8_t data);
+
+
+/**
+ * @brief Slave receive data
+ *
+ * @param config: I2C configuration
+ * @param data: Pointer to buffer for received data
+ * @param size: Size of the data
+ * @param timeout: Timeout for the operation
+ * @return I2C_Status: Status of the operation
+ */
+I2C_Status I2C_Slave_Receive(I2C_Config *config, uint8_t *data, uint16_t size, uint32_t timeout);
+
+
 
 /**
  * @brief Reads a single byte from a specific register of an I2C device.
@@ -316,6 +334,12 @@ void I2C_ER_IRQHandler(I2C_Config *config);
  * @param EnorDi: Set to ENABLE to enable specified events or DISABLE to disable them
  */
 void I2C_SlaveEnableDisableCallbackEvents(I2C_TypeDef *pI2Cx, I2C_Config *config, uint8_t EnorDi);
+/* Closing Data Transfers */
+void I2C_Close_SendData(I2C_Config *config);
+void I2C_Close_ReceiveData(I2C_Config *config);
 
-
+/* Event Flags API */
+void I2C_SetEventFlags(I2C_Config *config, uint16_t flags);
+uint16_t I2C_GetEventFlags(I2C_Config *config);
+void I2C_ClearEventFlags(I2C_Config *config, uint16_t flags);
 #endif /* I2C_H_ */
