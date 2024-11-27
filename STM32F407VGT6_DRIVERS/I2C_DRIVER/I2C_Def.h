@@ -1,19 +1,21 @@
 /*
  * I2C_Def.h
  *
- *  
- *Author: muskaan jain
+ *
+ * Author: muskaan jain
  */
 
 #ifndef I2C_DEF_H_
 #define I2C_DEF_H_
-
-#include "main.h"
+#include "GPIO.h"
+//#include "main.h"
+#include "stm32f4xx.h"
 #define I2C_READ    1
 #define I2C_WRITE   0
-
 #define I2C_Direction_Transmitter I2C_WRITE
 #define I2C_Direction_Receiver    I2C_READ
+#define I2C_DISABLE_SR            DISABLE/*DISABLE REPEATED START*/
+#define I2C_ENABLE_SR             ENABLE /*ENABLE REPEATED START*/
 /* Structure to hold I2C Pin configuration */
 typedef struct {
     uint8_t pinNumber;       // GPIO Pin number
@@ -28,18 +30,21 @@ typedef struct {
 
 /* I2C1 Pin Definitions */
 static const I2C_PinPair I2C1_Pins[] = {
-    { {6, GPIO_AF4_I2C1}, {7, GPIO_AF4_I2C1} },  // PB6 (SCL), PB7 (SDA)
-    { {8, GPIO_AF4_I2C1}, {9, GPIO_AF4_I2C1} }   // PB8 (SCL), PB9 (SDA)
+
+    { {6, GPIO_AF_I2C1}, {7, GPIO_AF_I2C1} },  // PB6 (SCL), PB7 (SDA)
+    { {8, GPIO_AF_I2C1}, {9, GPIO_AF_I2C1} }   // PB8 (SCL), PB9 (SDA)
 };
 
 /* I2C2 Pin Definitions */
 static const I2C_PinPair I2C2_Pins = {
-    { {10, GPIO_AF4_I2C2}, {11, GPIO_AF4_I2C2} }  // PB10 (SCL), PB11 (SDA)
+
+    {10, GPIO_AF_I2C2}, {11, GPIO_AF_I2C2}  // PB10 (SCL), PB11 (SDA)
 };
 
 /* I2C3 Pin Definitions */
 static const I2C_PinPair I2C3_Pins = {
-    { {8, GPIO_AF4_I2C3}, {9, GPIO_AF4_I2C3} }    // PA8 (SCL), PC9 (SDA)
+
+    {8, GPIO_AF_I2C3}, {9, GPIO_AF_I2C3}    // PA8 (SCL), PC9 (SDA)
 };
 
 
