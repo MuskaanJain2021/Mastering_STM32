@@ -4,8 +4,6 @@
  *
  *Author: muskaan jain
  */
-
-
 #include <stm32f4xx.h>
 #include "stm32f407xx.h"
 #include "I2C.h"
@@ -118,7 +116,22 @@ void I2C_AcknowledgeConfig(I2C_TypeDef *I2Cx, FunctionalState NewState)
         CLEAR_BIT(I2Cx->CR1, I2C_CR1_ACK); // Clear the ACK bit in CR1 register to disable acknowledgment.
     }
 }
-
+/**
+ * @brief Clear the ADDR flag in the I2C status registers.
+ *
+ * This function is used to clear the Address Sent (ADDR) flag in the
+ * I2C status register after the address has been acknowledged.
+ * It reads the status register to clear the ADDR flag. This is
+ * necessary to avoid any further interruptions in communication.
+ *
+ * @param I2Cx Pointer to the I2C peripheral base address.
+ *              This should be one of the I2C instances (I2C1, I2C2, or I2C3).
+ *
+ * @note
+ *  - The ADDR flag is set when an address is sent by the master or a slave address is matched
+ *    in slave mode. This function must be called after the address is transmitted to clear the flag.
+ *  - The ADDR flag can only be cleared by reading SR1 followed by SR2.
+ */
 /**
  * @brief Clears the ADDR flag in the I2C peripheral's status registers.
  *
@@ -279,14 +292,15 @@ uint8_t I2C_Start(I2C_Config *config)
 {
     int timeout = 1000;               // Correct variable name
     config->I2Cx->CR1 |= I2C_CR1_START;       /* Set the START bit to begin communication */
-    config->I2Cx->CR1 |= I2C_CR1_START;
-    while (!(config->I2Cx->SR1 & I2C_SR1_SB)) // Wait for the start bit to be set
+    //config->I2Cx->CR1 |= I2C_CR1_START;
+    while (!(READ_BIT(config->I2Cx->SR1 ,I2C_SR1_SB))) // Wait for the start bit to be set
     {
-        if (timeout == 0)
+        if (--timeout == 0)
         {
-            return -1; // Return error code on timeout
+        	 I2C_Stop(config); // Stop if timeout occurs
+        	return I2C_ERROR_TIMEOUT; // Return error code on timeout
         }
-        timeout--; // Decrement timeout counter
+
     }
     return I2C_OK; // Return success code
 }
@@ -406,7 +420,7 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
         }
     }
 
-    // Wait for BTF (Byte transfer finished)
+    //After sending the last byte, wait for BTF (Byte transfer finished)
     uint32_t BTF_timeout = timeout;
     while (!(READ_BIT(config->I2Cx->SR1, I2C_SR1_BTF)))
     {
@@ -415,10 +429,25 @@ I2C_Status I2C_Master_Transmit(I2C_Config *config, uint16_t address, const uint8
             I2C_Stop(config);
             return I2C_ERROR_TIMEOUT;
         }
+        // Check for any errors
+        if (READ_BIT(config->I2Cx->SR1, I2C_SR1_AF)) {
+                // Clear the Acknowledge failure flag
+             CLEAR_BIT(config->I2Cx->SR1, I2C_SR1_AF);
+             I2C_Stop(config);
+             return I2C_NACK_RECEIVED;
+            }
+        if (READ_BIT(config->I2Cx->SR1, I2C_SR1_BERR)) {
+                // Clear the Bus error flag
+             CLEAR_BIT(config->I2Cx->SR1, I2C_SR1_BERR);
+             I2C_Stop(config);
+             return I2C_ERROR_BUS;
+            }
     }
 
     // Generate stop condition
     I2C_Stop(config);
+
+
 
     return I2C_OK;
 }
@@ -805,6 +834,12 @@ I2C_Status I2C_CheckError(I2C_TypeDef *I2Cx)
         CLEAR_BIT(I2Cx->SR1, I2C_SR1_BERR);
         return I2C_ERROR_BUS; // bus error
     }
+
+    if (READ_BIT(I2Cx->SR1,I2C_SR1_TIMEOUT ))
+    {
+    	CLEAR_BIT(I2Cx->SR1, I2C_SR1_TIMEOUT);
+    	return I2C_ERROR_TIMEOUT; // TIMEOUT error
+    }
     return I2C_OK; // No error
 }
 
@@ -919,3 +954,201 @@ void I2C_Reset(I2C_Config *config)
     /* Disable I2C clock */
     I2C_Clock_Disable(config);
 }
+
+/**
+ * @brief Closes the I2C data send operation.
+ *
+ * This function disables the necessary interrupts and resets the
+ * internal state related to a transmission operation.
+ *
+ * @param config Pointer to the I2C_Config structure.
+ */
+void I2C_Close_SendData(I2C_Config *config) {
+    CLEAR_BIT(config->I2Cx->CR2, I2C_CR2_ITBUFEN); // Disable Buffer interrupt
+    CLEAR_BIT(config->I2Cx->CR2, I2C_CR2_ITEVTEN); // Disable Event interrupt
+
+    config->TxRxState = I2C_READY;   // Reset I2C state
+    config->TxBuffer = NULL;         // Clear transmit buffer
+    config->Txsize = 0;              // Reset transmit size
+}
+
+/**
+ * @brief Closes the I2C data receive operation.
+ *
+ * This function disables the necessary interrupts and resets the
+ * internal state related to a reception operation.
+ *
+ * @param config Pointer to the I2C_Config structure.
+ */
+void I2C_Close_ReceiveData(I2C_Config *config) {
+    CLEAR_BIT(config->I2Cx->CR2, I2C_CR2_ITBUFEN); // Disable Buffer interrupt
+    CLEAR_BIT(config->I2Cx->CR2, I2C_CR2_ITEVTEN); // Disable Event interrupt
+
+    config->TxRxState = I2C_READY;   // Reset I2C state
+    config->RxBuffer = NULL;         // Clear receive buffer
+    config->Rxsize = 0;              // Reset receive size
+    config->Txsize = 0;              // Reset transmit size
+
+    // Enable ACK if previously disabled
+    if (READ_BIT(config->I2Cx->CR1, I2C_CR1_ACK) == 0) {
+        I2C_AcknowledgeConfig(config->I2Cx, ENABLE);
+    }
+}
+/**
+ * @brief Application Event Callback.
+ *
+ * This function is used to notify the application of various I2C events.
+ *
+ * @param config Pointer to the I2C_Config structure.
+ * @param event Event ID to notify the application.
+ */
+__weak void I2C_ApplicationEventCallback(I2C_Config *config, uint8_t event) {
+    // User can override this function in their application
+}
+
+/**
+ * @brief Configures NVIC for I2C interrupts.
+ *
+ * @param IRQNumber IRQ number to configure.
+ * @param IRQPriority Priority to set for the IRQ.
+ * @param EnorDi Enable or disable the interrupt.
+ */
+void I2C_IRQInterruptConfig(uint8_t IRQNumber, uint8_t IRQPriority, uint8_t EnorDi) {
+    if (EnorDi == ENABLE) {
+        NVIC->ISER[IRQNumber >> 5] |= (1 << (IRQNumber & 0x1F));
+        NVIC->IP[IRQNumber] = (IRQPriority << 4);
+    } else {
+        NVIC->ICER[IRQNumber >> 5] &= ~(1 << (IRQNumber & 0x1F));
+    }
+}
+
+/**
+ * @brief Handles Master TXE (Transmit Buffer Empty) interrupt.
+ *
+ * This function manages the data transmission process during
+ * an interrupt-driven transfer.
+ *
+ * @param config Pointer to the I2C_Config structure.
+ */
+void I2C_Master_Handle_TXE(I2C_Config *config) {
+    if (config->Txsize > 0) {
+        // Load the data from TxBuffer to DR
+        WRITE_REG(config->I2Cx->DR, *config->TxBuffer);
+        config->TxBuffer++;
+        config->Txsize--;
+    } else {
+        // Transmission complete, close send operation
+        I2C_Close_SendData(config);
+    }
+}
+
+/**
+ * @brief Handles Master RXNE (Receive Buffer Not Empty) interrupt.
+ *
+ * This function manages the data reception process during
+ * an interrupt-driven transfer.
+ *
+ * @param config Pointer to the I2C_Config structure.
+ */
+void I2C_Master_Handle_RXNE(I2C_Config *config) {
+    if (config->Rxsize == 1) {
+        // Single byte reception
+        *config->RxBuffer = config->I2Cx->DR;
+        config->Rxsize--;
+    }
+    if(config->Rxsize > 1)
+    {
+    	if (config->Rxsize == 2)
+    	{
+    	   // Disable ACK and prepare for the last 2 bytes
+    		I2C_AcknowledgeConfig(config->I2Cx, DISABLE);
+    	}
+    	/*Read DR*/
+    	*config->RxBuffer = config->I2Cx->DR;
+    	config->RxBuffer++;
+    	config->Rxsize--;
+
+    }
+
+    if (config->Rxsize == 0) {
+    	// If repeated start is not required, generate stop condition
+    	if (config->Repeat_SR != I2C_DISABLE_SR)
+    	{
+    	    I2C_Stop(config);
+    	}
+    	// Close the receive operation and notify application
+        I2C_Close_ReceiveData(config);
+
+        // Notify application of completion
+        I2C_ApplicationEventCallback(config, I2C_EV_RX_CMPLT);
+    }
+}
+
+/**
+ * @brief Sets error flags for the I2C peripheral
+ *
+ * @param config: Pointer to the I2C_Config structure
+ * @param flags: Error flags to be set
+ */
+void I2C_SetErrorFlags(I2C_Config *config, uint16_t flags)
+{
+    config->I2Cx->SR1 |= flags;
+}
+
+/**
+ * @brief Clears error flags for the I2C peripheral
+ *
+ * @param config: Pointer to the I2C_Config structure
+ * @param flags: Error flags to be cleared
+ */
+void I2C_ClearErrorFlags(I2C_Config *config, uint16_t flags)
+{
+    config->I2Cx->SR1 &= ~flags;
+}
+
+/**
+ * @brief Gets error flags for the I2C peripheral
+ *
+ * @param config: Pointer to the I2C_Config structure
+ * @return uint16_t: Current error flags
+ */
+uint16_t I2C_GetErrorFlags(I2C_Config *config)
+{
+    return config->I2Cx->SR1;
+}
+
+
+
+/**
+ * @brief Clears event flags for the I2C peripheral
+ *
+ * @param config: Pointer to the I2C_Config structure
+ * @param flags: Event flags to be cleared
+ */
+void I2C_ClearEventFlags(I2C_Config *config, uint16_t flags)
+{
+    config->I2Cx->CR2 &= ~flags;
+}
+
+/* Event Flags API: Set Event Flags */
+/**
+ * @brief Sets event flags for the I2C peripheral
+ *
+ * @param config: Pointer to the I2C_Config structure
+ * @param flags: Event flags to be set
+ */
+void I2C_SetEventFlags(I2C_Config *config, uint16_t flags) {
+    config->TxRxState |= flags; // Combine existing state with new flags
+}
+
+/* Event Flags API: Get Event Flags */
+/**
+ * @brief Gets event flags for the I2C peripheral
+ *
+ * @param config: Pointer to the I2C_Config structure
+ * @return uint16_t: Current event flags
+ */
+uint16_t I2C_GetEventFlags(I2C_Config *config) {
+    return config->TxRxState; // Return the current state flags
+}
+
